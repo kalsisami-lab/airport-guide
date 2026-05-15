@@ -143,50 +143,58 @@ export default function Dashboard() {
     };
   }, [rawFlight, flightSwapped]);
 
+  // Helper: register an airport in the dynamic list and set it as active
+  const applyAirport = (iata: string, nameHint: string, cityHint: string, countryHint: string, schengenHint: boolean) => {
+    const meta = AIRPORT_META[iata];
+    if (!PINNED_IATAS.has(iata)) {
+      const ap: Airport = {
+        iata,
+        name: meta?.city ?? nameHint,
+        city: meta?.city ?? cityHint,
+        country: meta?.country ?? countryHint,
+        terminal: '',
+        inSchengen: meta?.inSchengen ?? schengenHint,
+      };
+      setDynamicAirports((prev) => prev.some((a) => a.iata === iata) ? prev : [...prev, ap]);
+    }
+    setAirportIata(iata);
+  };
+
   // Auto-set airport from flight origin when user hasn't manually chosen one.
-  // When a flight resolves the origin is authoritative — it always wins over the
-  // hub guess that was applied during the loading phase. Swap is manual-only.
+  // Also auto-detects direction: if the resolved airport matches the flight's
+  // destination (not origin), the user is on a return leg — auto-flip direction.
   useEffect(() => {
-    if (airportManuallySet) return;
     const raw = flightState.status === 'found' ? flightState.data
               : globalState.status === 'found' ? globalState.data
               : null;
+
     if (raw) {
-      const effectiveOriginIata = flightSwapped ? raw.destination.iata : raw.origin.iata;
-      // Pinned airports: just set directly
-      if (PINNED_IATAS.has(effectiveOriginIata)) {
-        setAirportIata(effectiveOriginIata);
-        return;
+      if (!airportManuallySet) {
+        // No manual airport: set from flight origin (respecting any existing swap)
+        const effectiveOriginIata = flightSwapped ? raw.destination.iata : raw.origin.iata;
+        applyAirport(
+          effectiveOriginIata,
+          flightSwapped ? raw.destination.city : raw.origin.name,
+          flightSwapped ? raw.destination.city : raw.origin.city,
+          flightSwapped ? raw.destination.country : '',
+          flightSwapped ? raw.destination.schengen : false,
+        );
+      } else {
+        // Airport was manually set — detect if user is actually at the destination
+        // (return flight) and auto-flip direction if so.
+        const currentIata = airportIata ?? '';
+        if (currentIata && currentIata === raw.destination.iata && currentIata !== raw.origin.iata) {
+          setFlightSwapped(true);
+        } else if (currentIata && currentIata === raw.origin.iata) {
+          setFlightSwapped(false);
+        }
       }
-      // Unknown airport — auto-add using flight data + shared metadata lookup
-      const meta = AIRPORT_META[effectiveOriginIata];
-      const newAirport: Airport = flightSwapped
-        ? {
-            iata: raw.destination.iata,
-            name: `${raw.destination.city}`,
-            city: meta?.city ?? raw.destination.city,
-            country: meta?.country ?? raw.destination.country,
-            terminal: '',
-            inSchengen: meta?.inSchengen ?? raw.destination.schengen,
-          }
-        : {
-            iata: raw.origin.iata,
-            name: raw.origin.name,
-            city: meta?.city ?? raw.origin.city,
-            country: meta?.country ?? '',
-            terminal: '',
-            inSchengen: meta?.inSchengen ?? false,
-          };
-      setDynamicAirports((prev) => {
-        if (prev.some((a) => a.iata === newAirport.iata)) return prev;
-        return [...prev, newAirport];
-      });
-      setAirportIata(effectiveOriginIata);
-    } else if (flightState.status === 'loading') {
+    } else if (flightState.status === 'loading' && !airportManuallySet) {
       const hub = AIRLINE_HUB[airlineCode];
       if (hub) setAirportIata(hub);
     }
-  }, [flightState, globalState, flightSwapped, airlineCode, airportManuallySet]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flightState, globalState, airlineCode, airportManuallySet]);
 
   const activeIata = airportIata ?? '';
   const airportLounges = loungesByAirport[activeIata] ?? [];
@@ -487,7 +495,31 @@ export default function Dashboard() {
                   </div>
                 </div>
                 <button
-                  onClick={() => setFlightSwapped((s) => !s)}
+                  onClick={() => {
+                    const newSwapped = !flightSwapped;
+                    setFlightSwapped(newSwapped);
+                    setAirportManuallySet(false); // let the effect re-apply the correct origin
+                    if (rawFlight) {
+                      // Immediately switch to the new departure airport
+                      if (newSwapped) {
+                        applyAirport(
+                          rawFlight.destination.iata,
+                          rawFlight.destination.city,
+                          rawFlight.destination.city,
+                          rawFlight.destination.country,
+                          rawFlight.destination.schengen,
+                        );
+                      } else {
+                        applyAirport(
+                          rawFlight.origin.iata,
+                          rawFlight.origin.name,
+                          rawFlight.origin.city,
+                          '',
+                          false,
+                        );
+                      }
+                    }
+                  }}
                   className="mt-2 w-full flex items-center justify-center gap-1.5 text-xs text-slate-500 hover:text-slate-300 transition-colors py-1"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

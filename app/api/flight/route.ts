@@ -57,13 +57,22 @@ export async function GET(req: NextRequest) {
 
   if (apiKey) {
     try {
-      const url = `https://api.aviationstack.com/v1/flights?access_key=${apiKey}&flight_iata=${flight}&limit=1`;
-      const res = await fetch(url, { next: { revalidate: 3600 } });
+      // Fetch up to 5 records — the API may return multiple dates; pick the one closest to now
+      const url = `https://api.aviationstack.com/v1/flights?access_key=${apiKey}&flight_iata=${flight}&limit=5`;
+      const res = await fetch(url, { next: { revalidate: 1800 } });
       if (res.ok) {
         const json = await res.json() as AviationResponse;
-        const row  = json.data?.[0];
-        if (row) {
-          const result = mapAviationRow(row, flight);
+        const rows = (json.data ?? []).filter((r) => r.departure?.iata && r.arrival?.iata);
+
+        // Sort rows by how close their scheduled departure is to right now; pick the nearest
+        const now = Date.now();
+        const sorted = rows
+          .map((r) => ({ r, delta: Math.abs(new Date(r.departure.scheduled ?? 0).getTime() - now) }))
+          .sort((a, b) => a.delta - b.delta);
+
+        const best = sorted[0]?.r ?? rows[0];
+        if (best) {
+          const result = mapAviationRow(best, flight);
           if (result) return NextResponse.json({ result, source: 'aviationstack' });
         }
       }
