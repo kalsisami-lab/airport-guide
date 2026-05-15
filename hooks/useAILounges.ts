@@ -10,6 +10,7 @@ interface Query {
   airportName: string | null;
   terminal?: string;
   airline?: string;
+  operatingCarrierCode?: string | null;  // IATA 2-letter code, e.g. "AY"
   card: CreditCard | null;
   status: AirlineStatus | null;
   departureZone?: 'schengen' | 'non-schengen' | 'international';
@@ -40,31 +41,34 @@ export function useAILounges(query: Query): AILoungeState & { refetch: () => voi
         m.startsWith('skyteam') ||
         m.startsWith('finnair-plus'),
     );
-    // Map internal IDs to human-readable alliance tiers
+
+    // Map internal IDs to human-readable alliance tier labels for the AI prompt
     const tierLabel: Record<string, string> = {
-      'oneworld-emerald':   'oneworld Emerald',
-      'oneworld-sapphire':  'oneworld Sapphire',
-      'star-alliance-gold': 'Star Alliance Gold',
-      'skyteam-elite-plus': 'SkyTeam Elite Plus',
+      'oneworld-emerald':      'oneworld Emerald',
+      'oneworld-sapphire':     'oneworld Sapphire',
+      'star-alliance-gold':    'Star Alliance Gold',
+      'skyteam-elite-plus':    'SkyTeam Elite Plus',
       'finnair-plus-platinum': 'oneworld Emerald (Finnair Platinum)',
       'finnair-plus-gold':     'oneworld Sapphire (Finnair Gold)',
     };
 
     const body = {
-      airportIata:    q.airportIata,
-      airportName:    q.airportName ?? q.airportIata,
-      terminal:       q.terminal,
-      airline:        q.airline,
-      cardName:       q.card?.name,
-      cardNetworks:   q.card?.loungeAccess,
-      statusName:     q.status?.name,
-      allianceTier:   allianceTier ? (tierLabel[allianceTier] ?? allianceTier) : undefined,
-      departureZone:  q.departureZone,
-      destination:    q.destination,
-      gate:           q.gate,
+      airportIata:          q.airportIata,
+      airportName:          q.airportName ?? q.airportIata,
+      terminal:             q.terminal,
+      airline:              q.airline,
+      operatingCarrierCode: q.operatingCarrierCode ?? null,
+      cardName:             q.card?.name,
+      cardNetworks:         q.card?.loungeAccess,
+      statusName:           q.status?.name,
+      statusAccessMethods:  q.status?.accessMethods ?? [],
+      allianceTier:         allianceTier ? (tierLabel[allianceTier] ?? allianceTier) : undefined,
+      departureZone:        q.departureZone,
+      destination:          q.destination,
+      gate:                 q.gate,
     };
 
-    // Fake progress: move to 'verifying' after ~3 s so the UI shows both steps
+    // Fake progress: switch to 'verifying' after ~3 s to reflect the two-step AI process
     const verifyTimer = setTimeout(() => setState({ phase: 'verifying' }), 3000);
 
     fetch('/api/lounges', {
@@ -89,10 +93,11 @@ export function useAILounges(query: Query): AILoungeState & { refetch: () => voi
   useEffect(() => {
     const key = [
       query.airportIata,
-      query.card?.id ?? '',
-      query.status?.id ?? '',
-      query.airline ?? '',
-      query.departureZone ?? '',
+      query.card?.id           ?? '',
+      query.status?.id         ?? '',
+      query.airline            ?? '',
+      query.departureZone      ?? '',
+      query.operatingCarrierCode ?? '',
     ].join('|');
 
     if (key === lastKeyRef.current) return;
@@ -105,7 +110,7 @@ export function useAILounges(query: Query): AILoungeState & { refetch: () => voi
     };
   // The key string above captures all relevant deps
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query.airportIata, query.card?.id, query.status?.id, query.airline, query.departureZone]);
+  }, [query.airportIata, query.card?.id, query.status?.id, query.airline, query.departureZone, query.operatingCarrierCode]);
 
   return { ...state, refetch: () => doFetch(query) };
 }

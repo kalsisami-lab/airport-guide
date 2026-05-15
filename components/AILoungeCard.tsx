@@ -1,4 +1,4 @@
-import type { AILounge, AILoungeTier } from '@/lib/aiLounge';
+import type { AILounge, AILoungeTier, LoungeNetwork } from '@/lib/aiLounge';
 
 const TIER_STYLES: Record<AILoungeTier, { badge: string; ring: string; label: string }> = {
   'ultra-premium': {
@@ -18,6 +18,16 @@ const TIER_STYLES: Record<AILoungeTier, { badge: string; ring: string; label: st
   },
 };
 
+const NETWORK_BADGE: Partial<Record<LoungeNetwork, { label: string; className: string }>> = {
+  'oneworld':       { label: 'oneworld',      className: 'bg-red-500/15 text-red-400 border-red-500/20' },
+  'star-alliance':  { label: 'Star Alliance', className: 'bg-yellow-500/15 text-yellow-500 border-yellow-500/20' },
+  'skyteam':        { label: 'SkyTeam',       className: 'bg-blue-600/15 text-blue-400 border-blue-600/20' },
+  'priority-pass':  { label: 'Priority Pass', className: 'bg-cyan-500/15 text-cyan-400 border-cyan-500/20' },
+  'lounge-key':     { label: 'LoungeKey',     className: 'bg-indigo-500/15 text-indigo-400 border-indigo-500/20' },
+  'dragon-pass':    { label: 'DragonPass',    className: 'bg-green-500/15 text-green-400 border-green-500/20' },
+  'amex-centurion': { label: 'Amex Platinum', className: 'bg-amber-500/15 text-amber-400 border-amber-500/20' },
+};
+
 type Props = {
   lounge: AILounge;
   isBest?: boolean;
@@ -25,6 +35,7 @@ type Props = {
 
 export default function AILoungeCard({ lounge, isBest }: Props) {
   const style = TIER_STYLES[lounge.tier] ?? TIER_STYLES.standard;
+  const networkBadge = NETWORK_BADGE[lounge.network];
 
   return (
     <div className={`rounded-2xl border p-5 bg-slate-800/60 border-slate-700/60 ${style.ring} ${isBest ? 'border-amber-500/40' : ''}`}>
@@ -69,6 +80,11 @@ export default function AILoungeCard({ lounge, isBest }: Props) {
         )}
 
         <span className="ml-auto flex items-center gap-1.5">
+          {networkBadge && (
+            <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${networkBadge.className}`}>
+              {networkBadge.label}
+            </span>
+          )}
           <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full border bg-emerald-500/15 text-emerald-300 border-emerald-500/30 max-w-[180px] truncate">
             {lounge.accessMethod}
           </span>

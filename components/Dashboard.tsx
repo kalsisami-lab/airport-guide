@@ -241,16 +241,17 @@ export default function Dashboard() {
   const departureZone: 'schengen' | 'non-schengen' | 'international' =
     area === 'both' ? 'international' : area;
 
-  // AI lounge lookup — fires whenever airport, credentials, or departure zone change
+  // AI lounge lookup — fires whenever airport, credentials, carrier, or departure zone change
   const aiState = useAILounges({
     airportIata,
-    airportName: airport?.name ?? null,
-    airline: rawFlight?.airline ?? undefined,
+    airportName:          airport?.name ?? null,
+    airline:              rawFlight?.airline ?? undefined,
+    operatingCarrierCode: airlineCode || null,
     card,
     status,
     departureZone,
     destination: resolvedDest?.city ?? undefined,
-    gate: gateInput || undefined,
+    gate:        gateInput || undefined,
   });
 
   // Fast Track eligibility derived directly from status access methods
