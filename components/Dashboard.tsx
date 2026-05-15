@@ -3,24 +3,19 @@
 import { useState, useMemo, useEffect } from 'react';
 import SelectInput from './SelectInput';
 import FastTrackStatus from './FastTrackStatus';
-import LoungeCard from './LoungeCard';
+import AILoungeCard from './AILoungeCard';
 import TravelAssistant from './TravelAssistant';
-import GlobalAllianceCard from './GlobalAllianceCard';
 import Settings, { LS_FLIGHT_API_KEY } from './Settings';
 import { airports, AIRLINE_HUB, type Airport } from '@/data/airports';
 import { AIRPORT_META, getRegionLabel } from '@/lib/airportCountryData';
 import { useAirportSearch } from '@/hooks/useAirportSearch';
 import { creditCards, type CreditCard } from '@/data/creditCards';
 import { airlineStatuses, type AirlineStatus } from '@/data/airlineStatuses';
-import { loungesByAirport } from '@/data/lounges';
 import { destinationsByAirport, type Destination } from '@/data/destinations';
-import { checkEligibility, parseAirlineCode } from '@/lib/eligibility';
+import { parseAirlineCode } from '@/lib/eligibility';
 import { useFlightLookup } from '@/hooks/useFlightLookup';
 import { useGlobalFlightSearch } from '@/hooks/useGlobalFlightSearch';
-import { parseGate } from '@/data/gates';
-import { estimateWalkingTime } from '@/lib/walkingTime';
-import type { LoungeArea } from '@/data/lounges';
-import type { WalkResult } from '@/lib/walkingTime';
+import { useAILounges } from '@/hooks/useAILounges';
 import type { ChatContext } from '@/lib/chatTypes';
 
 const LS_CARD   = 'airport-guide:cardId';
@@ -41,11 +36,16 @@ const statusOptions = airlineStatuses.map((s) => ({
   sublabel: s.airline,
 }));
 
-const areaOptions: { value: LoungeArea | 'both'; label: string; sublabel: string }[] = [
+const areaOptions: { value: 'schengen' | 'non-schengen' | 'both'; label: string; sublabel: string }[] = [
   { value: 'both',         label: 'Show all lounges', sublabel: 'Both Schengen and Non-Schengen' },
   { value: 'schengen',     label: 'Schengen',         sublabel: 'Flights within Schengen Area (EU/EEA)' },
   { value: 'non-schengen', label: 'Non-Schengen',     sublabel: 'Flights outside Schengen Area' },
 ];
+
+const FAST_TRACK_TIERS = new Set([
+  'oneworld-emerald', 'oneworld-sapphire', 'star-alliance-gold',
+  'skyteam-elite-plus', 'finnair-plus-platinum', 'finnair-plus-gold',
+]);
 
 export default function Dashboard() {
   const [airportIata, setAirportIata]           = useState<string | null>(null);
@@ -57,7 +57,7 @@ export default function Dashboard() {
   const [flightSwapped, setFlightSwapped]       = useState(false);
   const [gateInput, setGateInput]               = useState('');
   const [gateManuallySet, setGateManuallySet]   = useState(false);
-  const [manualArea, setManualArea]             = useState<LoungeArea | 'both'>('both');
+  const [manualArea, setManualArea]             = useState<'schengen' | 'non-schengen' | 'both'>('both');
   const [manualDestIata, setManualDestIata]     = useState<string | null>(null);
   const [hydrated, setHydrated]                 = useState(false);
   const [flightApiKey, setFlightApiKey]         = useState<string | null>(null);
@@ -209,8 +209,7 @@ export default function Dashboard() {
   }, [flightState, globalState, airlineCode, airportManuallySet]);
 
   const activeIata = airportIata ?? '';
-  const airportLounges = loungesByAirport[activeIata] ?? [];
-  const airportDests   = destinationsByAirport[activeIata] ?? [];
+  const airportDests = destinationsByAirport[activeIata] ?? [];
 
   const destinationOptions = useMemo(
     () => airportDests.map((d) => ({
@@ -227,7 +226,7 @@ export default function Dashboard() {
     return null;
   }, [effectiveDest, manualDestIata, airportDests]);
 
-  const area: LoungeArea | 'both' = useMemo(() => {
+  const area: 'schengen' | 'non-schengen' | 'both' = useMemo(() => {
     if (resolvedDest) {
       // Non-Schengen airports (HKG, SIN, JFK, DXB, etc.) have no Schengen/non-Schengen
       // split — all their departures are international. Using the destination's Schengen
@@ -239,22 +238,30 @@ export default function Dashboard() {
     return manualArea;
   }, [resolvedDest, manualArea, airport]);
 
-  const result = useMemo(
-    () => checkEligibility(card, status, airportLounges, area, airport?.name, airlineCode || undefined),
-    [card, status, airportLounges, area, airport, airlineCode],
+  const departureZone: 'schengen' | 'non-schengen' | 'international' =
+    area === 'both' ? 'international' : area;
+
+  // AI lounge lookup — fires whenever airport, credentials, or departure zone change
+  const aiState = useAILounges({
+    airportIata,
+    airportName: airport?.name ?? null,
+    airline: rawFlight?.airline ?? undefined,
+    card,
+    status,
+    departureZone,
+    destination: resolvedDest?.city ?? undefined,
+    gate: gateInput || undefined,
+  });
+
+  // Fast Track eligibility derived directly from status access methods
+  const hasFastTrack = useMemo(
+    () => !!status && status.accessMethods.some((m) => FAST_TRACK_TIERS.has(m)),
+    [status],
   );
-
-  const gate = useMemo(() => parseGate(gateInput, activeIata), [gateInput, activeIata]);
-
-  const walkResults = useMemo<Map<string, WalkResult>>(() => {
-    if (!gate) return new Map();
-    return new Map(
-      result.eligibleLounges.map((el) => [
-        el.lounge.id,
-        estimateWalkingTime(gate, el.lounge, activeIata),
-      ]),
-    );
-  }, [gate, result.eligibleLounges, activeIata]);
+  const fastTrackReasons = useMemo(
+    () => (hasFastTrack && status ? [status.name] : []),
+    [hasFastTrack, status],
+  );
 
   const chatContext = useMemo<ChatContext>(() => ({
     airport:     airport?.name ?? null,
@@ -265,17 +272,12 @@ export default function Dashboard() {
     flightNumber: flightNumber || null,
     destination: resolvedDest?.city ?? null,
     area:        area === 'both' ? null : area,
-    fastTrack:   result.hasFastTrack,
-    lounges:     result.eligibleLounges.map((el) => ({
-      name:       el.lounge.name,
-      reason:     el.reason,
-      accessible: el.areaMatch,
-      tier:       el.lounge.tier,
-    })),
-    allianceAccess: result.allianceAccess
-      ? { alliance: result.allianceAccess.alliance, tier: result.allianceAccess.tier }
-      : null,
-  }), [airport, airportIata, gateInput, card, status, flightNumber, resolvedDest, area, result]);
+    fastTrack:   hasFastTrack,
+    lounges:     aiState.phase === 'done'
+      ? aiState.lounges.map((l) => ({ name: l.name, reason: l.accessMethod, accessible: true, tier: l.tier }))
+      : [],
+    allianceAccess: null,
+  }), [airport, airportIata, gateInput, card, status, flightNumber, resolvedDest, area, hasFastTrack, aiState]);
 
   const historicalGate = rawFlight?.previousGate ?? null;
 
@@ -286,8 +288,7 @@ export default function Dashboard() {
     }
   }, [historicalGate, gateManuallySet]);
 
-  const hasInput            = !!(card || status || flightNumber);
-  const airportUnsupported  = !!airportIata && airportLounges.length === 0;
+  const hasInput        = !!(card || status || flightNumber);
   const isLoading       = flightState.status === 'loading';
   const isGlobalLoading = globalState.status === 'loading';
 
@@ -613,17 +614,6 @@ export default function Dashboard() {
                   maxLength={4}
                   className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 outline-none focus:border-blue-500 transition-colors"
                 />
-                {gateInput && (
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium">
-                    {gate ? (
-                      <span className={gate.area === 'schengen' ? 'text-teal-400' : 'text-purple-400'}>
-                        Pier {gate.pier} · {gate.area === 'schengen' ? 'Schengen' : 'Non-Schengen'}
-                      </span>
-                    ) : (
-                      <span className="text-slate-500">Unknown gate</span>
-                    )}
-                  </span>
-                )}
               </div>
               {historicalGate && (
                 <p className="mt-1.5 text-xs text-slate-500 flex items-center gap-1">
@@ -659,86 +649,55 @@ export default function Dashboard() {
               )}
             </div>
 
-            <FastTrackStatus
-              hasFastTrack={result.hasFastTrack}
-              reasons={result.fastTrackReasons}
-              isGlobal={airportUnsupported}
-            />
+            <FastTrackStatus hasFastTrack={hasFastTrack} reasons={fastTrackReasons} />
 
-            {airportUnsupported ? (
+            {/* AI lounge states */}
+            {(aiState.phase === 'fetching' || aiState.phase === 'verifying') && (
               <div className="space-y-3">
-                {/* Global view header */}
-                <div className="rounded-2xl bg-slate-800/60 border border-slate-700/60 p-5">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="w-9 h-9 rounded-xl bg-blue-600/20 flex items-center justify-center shrink-0">
-                      <svg className="w-5 h-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
-                          d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                    </div>
-                    <div>
-                      <p className="text-white font-semibold text-sm">Global View — {airportIata}</p>
-                      <p className="text-slate-500 text-xs">Your card &amp; alliance benefits apply worldwide · curated lounge cards shown below</p>
+                <div className="rounded-2xl border p-5 bg-slate-800/60 border-slate-700/60">
+                  <div className="flex items-center gap-2.5 mb-4">
+                    <span className="relative flex h-2.5 w-2.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-500" />
+                    </span>
+                    <span className="text-sm text-slate-300 font-medium">
+                      {aiState.phase === 'fetching' ? 'Checking lounge access…' : 'Verifying access rules…'}
+                    </span>
+                  </div>
+                  <div className="space-y-2 animate-pulse">
+                    <div className="h-4 bg-slate-700/60 rounded-full w-3/4" />
+                    <div className="h-3 bg-slate-700/40 rounded-full w-1/2" />
+                    <div className="flex gap-1.5 mt-3">
+                      <div className="h-6 bg-slate-700/40 rounded-full w-16" />
+                      <div className="h-6 bg-slate-700/40 rounded-full w-20" />
+                      <div className="h-6 bg-slate-700/40 rounded-full w-14" />
                     </div>
                   </div>
-
-                  {/* Priority Pass hint */}
-                  {card?.loungeAccess.includes('priority-pass') && (
-                    <div className="flex items-start gap-2.5 px-3.5 py-2.5 rounded-xl bg-slate-700/40 border border-slate-600/40 mb-2">
-                      <span className="text-base shrink-0">🌐</span>
-                      <div>
-                        <p className="text-slate-200 text-xs font-medium">Priority Pass — 1,400+ lounges worldwide</p>
-                        <p className="text-slate-500 text-xs mt-0.5">Open the Priority Pass app to find and access lounges at {airportIata}.</p>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* LoungeKey hint */}
-                  {!card?.loungeAccess.includes('priority-pass') && card?.loungeAccess.includes('lounge-key') && (
-                    <div className="flex items-start gap-2.5 px-3.5 py-2.5 rounded-xl bg-slate-700/40 border border-slate-600/40 mb-2">
-                      <span className="text-base shrink-0">🔑</span>
-                      <div>
-                        <p className="text-slate-200 text-xs font-medium">LoungeKey — 1,000+ airport lounges</p>
-                        <p className="text-slate-500 text-xs mt-0.5">Check the LoungeKey app or website for lounges at {airportIata}.</p>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Amex Platinum global dining */}
-                  {card?.id === 'amex-platinum' && (
-                    <div className="flex items-start gap-2.5 px-3.5 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 mb-2">
-                      <span className="text-base shrink-0">✨</span>
-                      <div>
-                        <p className="text-amber-300 text-xs font-medium">Amex Platinum — Global Dining &amp; Centurion Lounges</p>
-                        <p className="text-slate-400 text-xs mt-0.5">Check for Centurion Lounges or partner restaurant credits at {airportIata} via the Amex Travel app.</p>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* No card and no status at all */}
-                  {!card && !result.allianceAccess && (
-                    <p className="text-slate-500 text-xs px-1">
-                      Select a credit card or airline status above to see which global lounge networks you can access.
-                    </p>
-                  )}
                 </div>
-
-                {/* Smart Alliance Card — rendered like a proper lounge card */}
-                {result.allianceAccess && (
-                  <GlobalAllianceCard
-                    access={result.allianceAccess}
-                    iataCode={airportIata!}
-                    gateLabel={gateInput || undefined}
-                  />
-                )}
-
-                {/* Supported airports reminder */}
-                <p className="text-xs text-slate-600 text-center px-2">
-                  Full lounge data: HEL · LHR · AMS · ARN · FRA · CDG · HKG
-                  {effectiveFlightKey ? ' · Search any airport above' : ' — add API key to search worldwide'}
-                </p>
+                <div className="rounded-2xl border p-5 bg-slate-800/40 border-slate-700/40 animate-pulse opacity-50">
+                  <div className="space-y-2">
+                    <div className="h-4 bg-slate-700/60 rounded-full w-2/3" />
+                    <div className="h-3 bg-slate-700/40 rounded-full w-1/3" />
+                  </div>
+                </div>
               </div>
-            ) : result.eligibleLounges.length === 0 ? (
+            )}
+
+            {aiState.phase === 'error' && (
+              <div className="rounded-2xl bg-slate-800/60 border border-red-500/20 p-6 text-center">
+                <div className="text-3xl mb-2">⚠️</div>
+                <p className="text-slate-300 font-medium">Could not load lounge data</p>
+                <p className="text-slate-500 text-sm mt-1">{aiState.message}</p>
+                <button
+                  onClick={aiState.refetch}
+                  className="mt-3 text-xs text-blue-400 hover:text-blue-300 transition-colors underline underline-offset-2"
+                >
+                  Try again
+                </button>
+              </div>
+            )}
+
+            {aiState.phase === 'done' && aiState.lounges.length === 0 && (
               <div className="rounded-2xl bg-slate-800/60 border border-slate-700/60 p-6 text-center">
                 <div className="text-3xl mb-2">🚫</div>
                 <p className="text-slate-300 font-medium">No lounge access found</p>
@@ -746,30 +705,16 @@ export default function Dashboard() {
                   Try adding a Priority Pass card or a qualifying airline status
                 </p>
               </div>
-            ) : (
+            )}
+
+            {aiState.phase === 'done' && aiState.lounges.length > 0 && (
               <div className="space-y-3">
-                {/* Combined access summary when both card network and alliance status apply */}
-                {result.allianceAccess && card && result.eligibleLounges.some((e) => e.accessMethod === 'priority-pass' || e.accessMethod === 'lounge-key') && result.eligibleLounges.some((e) => e.accessMethod.startsWith('oneworld') || e.accessMethod.startsWith('finnair') || e.accessMethod.startsWith('star-alliance') || e.accessMethod.startsWith('skyteam')) && (
-                  <div className="flex items-start gap-2.5 px-3.5 py-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20">
-                    <span className="text-base shrink-0">🎯</span>
-                    <div>
-                      <p className="text-blue-300 text-xs font-medium">Multiple access paths available</p>
-                      <p className="text-slate-400 text-xs mt-0.5">
-                        Your {result.allianceAccess.alliance === 'oneworld' ? 'oneworld' : result.allianceAccess.alliance === 'star-alliance' ? 'Star Alliance' : 'SkyTeam'} {result.allianceAccess.tier} status and your card&apos;s lounge network both unlock lounges here — pick whichever suits your gate and preference.
-                      </p>
-                    </div>
-                  </div>
-                )}
-                {result.eligibleLounges.map((el, i) => (
-                  <LoungeCard
-                    key={el.lounge.id}
-                    eligible={el}
-                    isBest={i === 0 && el.areaMatch}
-                    walkResult={walkResults.get(el.lounge.id)}
-                    gateLabel={gateInput || undefined}
-                    airportIata={activeIata || undefined}
-                  />
+                {aiState.lounges.map((l, i) => (
+                  <AILoungeCard key={l.id} lounge={l} isBest={i === 0} />
                 ))}
+                {aiState.notes && (
+                  <p className="text-xs text-slate-500 px-1">{aiState.notes}</p>
+                )}
               </div>
             )}
 
