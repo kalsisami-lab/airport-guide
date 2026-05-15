@@ -138,7 +138,8 @@ export async function searchGlobalFlight(flightNumber: string, apiKey?: string |
   // 1. Try real API via server route — pass client key as header so it never appears in URL
   try {
     const headers: HeadersInit = {};
-    if (apiKey) headers['x-flight-api-key'] = apiKey;
+    // '__server__' means the server has the key in env — don't forward as header
+    if (apiKey && apiKey !== '__server__') headers['x-flight-api-key'] = apiKey;
     const res = await fetch(`/api/flight?flight=${encodeURIComponent(key)}`, { headers });
     if (res.ok) {
       const data = await res.json() as { result: GlobalSearchResult | null; source: string };

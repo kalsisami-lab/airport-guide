@@ -21,7 +21,8 @@ export function useAirportSearch(apiKey: string | null) {
     timerRef.current = setTimeout(async () => {
       try {
         const headers: HeadersInit = {};
-        if (apiKey) headers['x-flight-api-key'] = apiKey;
+        // '__server__' means the server has the key in env — don't forward it as a header
+        if (apiKey && apiKey !== '__server__') headers['x-flight-api-key'] = apiKey;
         const res = await fetch(`/api/airports?q=${encodeURIComponent(query)}`, { headers });
         if (res.ok) {
           const data = await res.json() as { airports: Airport[] };

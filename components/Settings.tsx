@@ -6,9 +6,10 @@ export const LS_FLIGHT_API_KEY = 'airport-guide:flightApiKey';
 
 interface Props {
   onKeyChange: (key: string | null) => void;
+  serverHasKey?: boolean;
 }
 
-export default function Settings({ onKeyChange }: Props) {
+export default function Settings({ onKeyChange, serverHasKey }: Props) {
   const [open, setOpen]   = useState(false);
   const [draft, setDraft] = useState('');
   const [saved, setSaved] = useState<string | null>(null);
@@ -86,49 +87,64 @@ export default function Settings({ onKeyChange }: Props) {
             </div>
 
             <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-widest text-slate-400 mb-2">
-                  Flight API Key
-                </label>
-                <input
-                  type="password"
-                  value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && save()}
-                  placeholder="Paste your Aviationstack key…"
-                  className="w-full px-3.5 py-3 bg-slate-800 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 outline-none focus:border-blue-500 transition-colors font-mono tracking-wider"
-                />
-                <p className="mt-1.5 text-xs text-slate-500">
-                  Get a free key at{' '}
-                  <span className="text-blue-400">aviationstack.com</span>
-                  {' '}— enables real-time flight data worldwide. Key is stored locally on your device only.
-                </p>
-              </div>
+              {serverHasKey ? (
+                <div className="flex items-start gap-3 px-3.5 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                  <span className="w-2 h-2 bg-emerald-400 rounded-full shrink-0 mt-1" />
+                  <div>
+                    <p className="text-emerald-300 text-sm font-medium">Live flight data active</p>
+                    <p className="text-slate-400 text-xs mt-0.5">
+                      Flight API key is configured on the server — no local key needed.
+                      Real-time global flight lookup is enabled.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-widest text-slate-400 mb-2">
+                    Flight API Key
+                  </label>
+                  <input
+                    type="password"
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && save()}
+                    placeholder="Paste your Aviationstack key…"
+                    className="w-full px-3.5 py-3 bg-slate-800 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 outline-none focus:border-blue-500 transition-colors font-mono tracking-wider"
+                  />
+                  <p className="mt-1.5 text-xs text-slate-500">
+                    Get a free key at{' '}
+                    <span className="text-blue-400">aviationstack.com</span>
+                    {' '}— enables real-time flight data worldwide. Key is stored locally on your device only.
+                  </p>
+                </div>
+              )}
 
-              {saved && (
+              {!serverHasKey && saved && (
                 <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
                   <span className="w-2 h-2 bg-emerald-400 rounded-full shrink-0" />
                   <p className="text-emerald-300 text-xs font-medium">Real-time flight data active</p>
                 </div>
               )}
 
-              <div className="flex gap-2 pt-1">
-                <button
-                  onClick={save}
-                  disabled={!draft.trim()}
-                  className="flex-1 py-3 rounded-xl bg-blue-600 text-white text-sm font-semibold disabled:opacity-40 hover:bg-blue-500 active:bg-blue-700 transition-colors"
-                >
-                  Save Key
-                </button>
-                {saved && (
+              {!serverHasKey && (
+                <div className="flex gap-2 pt-1">
                   <button
-                    onClick={clear}
-                    className="px-4 py-3 rounded-xl bg-slate-800 border border-slate-700 text-slate-400 text-sm hover:text-red-400 hover:border-red-400/30 transition-colors"
+                    onClick={save}
+                    disabled={!draft.trim()}
+                    className="flex-1 py-3 rounded-xl bg-blue-600 text-white text-sm font-semibold disabled:opacity-40 hover:bg-blue-500 active:bg-blue-700 transition-colors"
                   >
-                    Clear
+                    Save Key
                   </button>
-                )}
-              </div>
+                  {saved && (
+                    <button
+                      onClick={clear}
+                      className="px-4 py-3 rounded-xl bg-slate-800 border border-slate-700 text-slate-400 text-sm hover:text-red-400 hover:border-red-400/30 transition-colors"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>

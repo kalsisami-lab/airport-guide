@@ -61,6 +61,15 @@ export default function Dashboard() {
   const [manualDestIata, setManualDestIata]     = useState<string | null>(null);
   const [hydrated, setHydrated]                 = useState(false);
   const [flightApiKey, setFlightApiKey]         = useState<string | null>(null);
+  const [serverHasFlightKey, setServerHasFlightKey] = useState(false);
+
+  // Check whether the server already has FLIGHT_API_KEY configured
+  useEffect(() => {
+    fetch('/api/config')
+      .then((r) => r.json())
+      .then((d: { hasFlightKey: boolean }) => { if (d.hasFlightKey) setServerHasFlightKey(true); })
+      .catch(() => {});
+  }, []);
 
   // Restore persisted card / status / API key on first mount
   useEffect(() => {
@@ -114,7 +123,10 @@ export default function Dashboard() {
   );
 
   const airlineCode = parseAirlineCode(flightNumber);
-  const { results: airportSearchResults, loading: airportSearchLoading, search: searchAirports } = useAirportSearch(flightApiKey);
+  // Effective key: user's locally stored key, or a sentinel when the server has one configured
+  const effectiveFlightKey = flightApiKey ?? (serverHasFlightKey ? '__server__' : null);
+
+  const { results: airportSearchResults, loading: airportSearchLoading, search: searchAirports } = useAirportSearch(effectiveFlightKey);
 
   const airportSearchOptions = useMemo(() => airportSearchResults.map((a) => ({
     value: a.iata,
@@ -324,13 +336,13 @@ export default function Dashboard() {
                 <div className="text-xs text-blue-400 font-medium">IATA: {airport.iata}</div>
               </div>
             )}
-            {hydrated && !flightApiKey && (
+            {hydrated && !effectiveFlightKey && (
               <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/20 hidden sm:inline">
                 Demo
               </span>
             )}
             {hydrated && (
-              <Settings onKeyChange={setFlightApiKey} />
+              <Settings onKeyChange={setFlightApiKey} serverHasKey={serverHasFlightKey} />
             )}
           </div>
         </div>
@@ -441,14 +453,14 @@ export default function Dashboard() {
             {/* Search global database button */}
             {showSearchBtn && (
               <button
-                onClick={() => searchGlobal(flightNumber, flightApiKey)}
+                onClick={() => searchGlobal(flightNumber, effectiveFlightKey)}
                 className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600/20 border border-blue-500/30 text-blue-400 text-sm font-medium hover:bg-blue-600/30 transition-colors"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
                 Search Global Database
-                {!flightApiKey && (
+                {!effectiveFlightKey && (
                   <span className="text-xs font-medium px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 ml-1">
                     Demo
                   </span>
@@ -579,7 +591,7 @@ export default function Dashboard() {
                 setAirportManuallySet(true);
               }}
               icon="🏛️"
-              onSearch={flightApiKey ? searchAirports : undefined}
+              onSearch={effectiveFlightKey ? searchAirports : undefined}
               asyncOptions={airportSearchOptions}
               isSearching={airportSearchLoading}
             />
@@ -723,7 +735,7 @@ export default function Dashboard() {
                 {/* Supported airports reminder */}
                 <p className="text-xs text-slate-600 text-center px-2">
                   Full lounge data: HEL · LHR · AMS · ARN · FRA · CDG · HKG
-                  {flightApiKey ? ' · Search any airport above' : ' — add API key to search worldwide'}
+                  {effectiveFlightKey ? ' · Search any airport above' : ' — add API key to search worldwide'}
                 </p>
               </div>
             ) : result.eligibleLounges.length === 0 ? (
