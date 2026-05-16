@@ -165,7 +165,7 @@ export async function POST(req: NextRequest) {
     // Airport not yet in database — return empty, never 500
     return NextResponse.json({
       lounges: [],
-      notes: `${iata} is not yet in our lounge database. We currently cover HEL, FRA, and SIN.`,
+      notes: `${iata} is not yet in our lounge database.`,
     });
   }
 
