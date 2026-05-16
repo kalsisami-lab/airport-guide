@@ -8,7 +8,7 @@ export interface ChatContext {
   destination?: string | null;
   area?: string | null;
   fastTrack?: boolean;
-  lounges?: { name: string; reason: string; accessible: boolean; tier: string }[];
+  lounges?: { name: string; reason: string; accessible: boolean; tier: string; amenities?: string[] }[];
   allianceAccess?: { alliance: string; tier: string } | null;
 }
 

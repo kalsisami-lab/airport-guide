@@ -13,6 +13,9 @@ function buildSystemPrompt(ctx: ChatContext): string {
   p.push(
     `You are an expert airport concierge and lounge access specialist embedded in a mobile airport guide app. ` +
     `Your knowledge covers alliance lounge rules, Priority Pass and LoungeKey networks, credit card travel perks, and major international airports worldwide. ` +
+    `CRITICAL: Always read and directly answer the traveller's exact question. ` +
+    `If they ask about a specific feature (champagne, food, showers, wifi, children's area, etc.), look it up in the LOUNGE AMENITIES section below and answer specifically. ` +
+    `Do NOT default to reciting their lounge access summary — they already see that on screen. ` +
     `Answer in 2–4 sentences of plain text. No markdown, no bullet points, no headers. ` +
     `Be precise, practical, and friendly — the traveller is at the airport right now.`,
   );
@@ -102,6 +105,13 @@ NO1 LOUNGE Arlanda: Priority Pass / LoungeKey.`);
       ctx_lines.push(
         `Accessible lounges (app confirmed): ${accessible.map((l) => `${l.name} [${l.tier}] via ${l.reason}`).join(' | ')}`,
       );
+      // Inject amenities so the model can answer feature-specific questions
+      const amenityLines = accessible
+        .filter((l) => l.amenities && l.amenities.length > 0)
+        .map((l) => `  ${l.name}: ${l.amenities!.join(', ')}`);
+      if (amenityLines.length > 0) {
+        ctx_lines.push(`LOUNGE AMENITIES (use these to answer questions about food, drinks, and facilities):\n${amenityLines.join('\n')}`);
+      }
     }
     if (blocked.length > 0) {
       ctx_lines.push(`Blocked (wrong area for this flight): ${blocked.map((l) => l.name).join(', ')}`);
@@ -123,9 +133,28 @@ NO1 LOUNGE Arlanda: Priority Pass / LoungeKey.`);
 }
 
 // ── Simulation fallback (no API key, or API quota exceeded) ──────────────────
-function simulate(userMessage: string, ctx: ChatContext): string {
-  const lower = userMessage.toLowerCase();
 
+// Returns all amenities from the user's accessible lounges as a flat deduplicated list.
+function collectAccessibleAmenities(ctx: ChatContext): string[] {
+  const accessible = ctx.lounges?.filter((l) => l.accessible) ?? [];
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const l of accessible) {
+    for (const a of l.amenities ?? []) {
+      const key = a.toLowerCase();
+      if (!seen.has(key)) { seen.add(key); result.push(a); }
+    }
+  }
+  return result;
+}
+
+// Checks whether a feature keyword appears in the available amenities.
+function amenityHas(amenities: string[], ...keywords: string[]): boolean {
+  const joined = amenities.join(' ').toLowerCase();
+  return keywords.some((k) => joined.includes(k.toLowerCase()));
+}
+
+function simulate(userMessage: string, ctx: ChatContext): string {
   const allianceName = ctx.allianceAccess
     ? ctx.allianceAccess.alliance === 'oneworld' ? 'oneworld'
     : ctx.allianceAccess.alliance === 'star-alliance' ? 'Star Alliance'
@@ -138,19 +167,102 @@ function simulate(userMessage: string, ctx: ChatContext): string {
     skyteam:         'Air France, KLM, Delta Air Lines, or Korean Air',
   };
 
-  if (lower.includes('lounge') || lower.includes('access')) {
-    if (ctx.lounges && ctx.lounges.length > 0) {
-      const accessible = ctx.lounges.filter((l) => l.accessible);
-      if (accessible.length > 0) {
-        const best = accessible[0];
-        const others = accessible.slice(1).map((l) => l.name);
-        const otherStr = others.length > 0 ? ` You also have access to ${others.join(', ')}.` : '';
-        const airportStr = ctx.airport ? ` at ${ctx.airport}` : '';
-        return `Your top lounge${airportStr} is ${best.name} (${best.tier.replace('-', ' ')}) via your ${best.reason}.${otherStr} Head to the lounge about 90 minutes before departure and show your status card or boarding pass.`;
+  const accessible = ctx.lounges?.filter((l) => l.accessible) ?? [];
+  const amenities  = collectAccessibleAmenities(ctx);
+  const hasLounges = accessible.length > 0;
+  const bestLounge = accessible[0];
+
+  // ── Feature-specific questions (answered from amenity data when available) ──
+  // These must be checked BEFORE the generic "lounge" keyword branch so that
+  // "Saako loungessa shampanjaa?" doesn't collapse into the access template.
+
+  const isChampagne = /champagne|sparkling|bubbly|samppanja|shampanj/i.test(userMessage);
+  const isFood      = /food|eat|meal|buffet|dining|menu|cuisine|restaurant|ruoka|syö/i.test(userMessage);
+  const isBar       = /\bbar\b|drink|alcohol|wine|beer|spirit|cocktail|juoma|alkohol/i.test(userMessage);
+  const isShower    = /shower|bath|wash|suihku/i.test(userMessage);
+  const isWifi      = /wifi|wi-fi|internet|wireless/i.test(userMessage);
+  const isSpa       = /\bspa\b|massage|sauna|relax|hieronta/i.test(userMessage);
+  const isChildren  = /child|kid|baby|family|lapsi|perhe/i.test(userMessage);
+  const isWork      = /work|desk|business.cent|laptop|office|työ/i.test(userMessage);
+
+  if (isChampagne || isBar) {
+    if (hasLounges) {
+      const hasChamp = amenityHas(amenities, 'champagne');
+      const hasBar   = amenityHas(amenities, 'bar', 'cocktail', 'spirits', 'premium bar');
+      if (isChampagne) {
+        if (hasChamp) return `Yes — ${bestLounge.name} offers champagne as part of its premium bar. It's available to help yourself at the bar area during opening hours.`;
+        if (hasBar)   return `${bestLounge.name} has a full bar with wines and spirits, but champagne isn't specifically listed in the amenities — ask staff at the bar when you arrive.`;
+        return `Champagne isn't listed in the amenities for your accessible lounge${ctx.airport ? ` at ${ctx.airport}` : ''}. The bar may still have sparkling wine — worth asking at the counter.`;
       }
-      return 'Based on your current card and status, no lounges are accessible for this flight. A Priority Pass card would open doors here.';
+      // General bar question
+      if (hasBar) return `Yes — ${bestLounge.name} has a bar serving drinks${amenityHas(amenities, 'cocktail') ? ', including cocktails' : ''}. It's complimentary during your visit.`;
+      return `${bestLounge.name} has beverage service but a full bar isn't specifically listed — light drinks and non-alcoholic options are typically available in all lounges.`;
     }
-    // Alliance access at any airport (including global ones)
+  }
+
+  if (isFood) {
+    if (hasLounges) {
+      const hasAlaCarte = amenityHas(amenities, 'à la carte', 'a la carte', 'dining', 'restaurant', 'chef');
+      const hasBuffet   = amenityHas(amenities, 'buffet');
+      if (hasAlaCarte) return `${bestLounge.name} offers à la carte dining — you can order from a menu rather than just a buffet. A great option for a proper meal before your flight.`;
+      if (hasBuffet)   return `${bestLounge.name} has a hot and cold buffet. Food is self-serve and replenished throughout opening hours — good for a quick meal or snacks.`;
+      return `Light food and snacks are available at ${bestLounge.name}. For a full meal, check the lounge's menu board when you arrive.`;
+    }
+  }
+
+  if (isShower) {
+    if (hasLounges) {
+      const hasShower = amenityHas(amenities, 'shower');
+      if (hasShower) return `Yes — ${bestLounge.name} has shower suites available. Towels and toiletries are provided; you may need to request a slot at the reception desk as demand can be high.`;
+      return `Showers aren't listed in the amenities for ${bestLounge.name}. If you need a shower, ask staff when you arrive — some lounges have facilities not shown online.`;
+    }
+  }
+
+  if (isSpa) {
+    if (hasLounges) {
+      const hasSpa = amenityHas(amenities, 'spa', 'massage', 'sauna');
+      if (hasSpa) return `Yes — ${bestLounge.name} has spa or wellness facilities. These are a highlight of the lounge; book or request a slot at reception as soon as you arrive.`;
+      return `Spa or massage services aren't listed for ${bestLounge.name}. The lounge still offers shower facilities and a comfortable rest area.`;
+    }
+  }
+
+  if (isWifi) {
+    if (hasLounges) {
+      const hasWifi = amenityHas(amenities, 'wifi', 'wi-fi', 'internet');
+      if (hasWifi) return `Yes — ${bestLounge.name} has high-speed WiFi. The password is usually on a card at the reception desk or on tables throughout the lounge.`;
+      return `WiFi availability isn't confirmed for ${bestLounge.name}, but virtually all airport lounges offer it — ask staff for the network name and password.`;
+    }
+  }
+
+  if (isChildren) {
+    if (hasLounges) {
+      const hasKids = amenityHas(amenities, "children's", 'kids', 'family', 'play');
+      if (hasKids) return `Yes — ${bestLounge.name} has a children's area or family facilities. A great option if you're travelling with kids.`;
+      return `A dedicated children's area isn't listed for ${bestLounge.name}, but families are welcome — the lounge will have comfortable seating and food options suitable for children.`;
+    }
+  }
+
+  if (isWork) {
+    if (hasLounges) {
+      const hasWork = amenityHas(amenities, 'work', 'desk', 'business centre', 'station');
+      if (hasWork) return `Yes — ${bestLounge.name} has work desks and business facilities. Look for the dedicated workstation area, usually quieter than the main lounge space.`;
+      return `Dedicated work desks aren't specifically listed for ${bestLounge.name}, but all lounges have seating with power outlets — suitable for laptop work.`;
+    }
+  }
+
+  // ── Lounge access question ──────────────────────────────────────────────────
+  // Only match explicit lounge/access questions — avoid catching Finnish words
+  // like "loungessa" as a lounge-access query when it's really a feature question.
+  const isAccessQuestion = /\b(lounge|access|enter|get in|pääsy|pääsen)\b/i.test(userMessage) &&
+    !isChampagne && !isFood && !isBar && !isShower && !isSpa && !isWifi && !isChildren && !isWork;
+
+  if (isAccessQuestion) {
+    if (hasLounges) {
+      const others   = accessible.slice(1).map((l) => l.name);
+      const otherStr = others.length > 0 ? ` You also have access to ${others.join(', ')}.` : '';
+      const airportStr = ctx.airport ? ` at ${ctx.airport}` : '';
+      return `Your top lounge${airportStr} is ${bestLounge.name} (${bestLounge.tier.replace('-', ' ')}) via your ${bestLounge.reason}.${otherStr} Head to the lounge about 90 minutes before departure and show your boarding pass or status card.`;
+    }
     if (ctx.allianceAccess && allianceName) {
       const { tier } = ctx.allianceAccess;
       const partners = alliancePartners[ctx.allianceAccess.alliance] ?? 'partner carrier lounges';
@@ -163,7 +275,8 @@ function simulate(userMessage: string, ctx: ChatContext): string {
     return 'Select your credit card or airline status above and I can tell you exactly which lounges you can access.';
   }
 
-  if (lower.includes('fast track') || lower.includes('security')) {
+  // ── Fast Track / security ───────────────────────────────────────────────────
+  if (/fast.?track|security|queue|lane/i.test(userMessage)) {
     if (ctx.fastTrack) {
       const suffix = ctx.allianceAccess ? ` as a ${allianceName} ${ctx.allianceAccess.tier} member` : '';
       return `Yes — you have Fast Track access${ctx.airport ? ` at ${ctx.airport}` : ''}${suffix}. Look for the dedicated Fast Track lane at security, usually signposted separately from the main queue.`;
@@ -171,23 +284,25 @@ function simulate(userMessage: string, ctx: ChatContext): string {
     return `Fast Track isn't confirmed for your current setup${ctx.airport ? ` at ${ctx.airport}` : ''}. Allow at least 30–40 minutes for standard security.`;
   }
 
-  if (lower.includes('hkg') || lower.includes('hong kong') || lower.includes('cathay')) {
-    return 'At Hong Kong International, The Wing and The Pier are Cathay Pacific\'s flagship lounges (T1, Level 6). oneworld Sapphire gets you the Business Class lounge; Emerald gets First Class. Plaza Premium accepts Priority Pass at three locations across T1.';
+  // ── HKG-specific ────────────────────────────────────────────────────────────
+  if (/hkg|hong kong|cathay/i.test(userMessage)) {
+    return "At Hong Kong International, The Wing and The Pier are Cathay Pacific's flagship lounges (T1, Level 6). oneworld Sapphire gets you the Business Class lounge; Emerald gets First Class. Plaza Premium accepts Priority Pass at three locations across T1.";
   }
 
-  if (lower.includes('gate') || lower.includes('walk') || lower.includes('distance')) {
+  // ── Walking / gate ──────────────────────────────────────────────────────────
+  if (/\bgate\b|walk|distance|how far/i.test(userMessage)) {
     if (ctx.gate) {
       return `You're at Gate ${ctx.gate}. Walking times are shown in the app for each lounge — check the lounge cards above.`;
     }
-    return 'Enter your gate number in the app and I\'ll show walking time estimates to each lounge.';
+    return "Enter your gate number in the app and I'll show walking time estimates to each lounge.";
   }
 
-  // Alliance-aware greeting for global airports
+  // ── Fallback ────────────────────────────────────────────────────────────────
   if (ctx.allianceAccess && allianceName && ctx.airport) {
-    return `At ${ctx.airport}, use your ${allianceName} ${ctx.allianceAccess.tier} status to access partner lounges. Ask me specifically about lounges, fast track, or anything else and I can give you tailored advice.`;
+    return `At ${ctx.airport}, use your ${allianceName} ${ctx.allianceAccess.tier} status to access partner lounges. Ask me specifically about lounges, fast track, food, drinks, or any other feature.`;
   }
 
-  return `I'm your airport assistant${ctx.airport ? ` for ${ctx.airport}` : ''}. Ask me about lounges, fast track, walking times, or any travel tip.`;
+  return `I'm your airport assistant${ctx.airport ? ` for ${ctx.airport}` : ''}. Ask me about lounges, fast track, champagne, food, showers, or any travel tip.`;
 }
 
 // ── Route handler ─────────────────────────────────────────────────────────────

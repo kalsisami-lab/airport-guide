@@ -275,7 +275,7 @@ export default function Dashboard() {
     area:        area === 'both' ? null : area,
     fastTrack:   hasFastTrack,
     lounges:     aiState.phase === 'done'
-      ? aiState.lounges.map((l) => ({ name: l.name, reason: l.accessMethod, accessible: true, tier: l.tier }))
+      ? aiState.lounges.map((l) => ({ name: l.name, reason: l.accessMethod, accessible: true, tier: l.tier, amenities: l.amenities }))
       : [],
     allianceAccess: null,
   }), [airport, airportIata, gateInput, card, status, flightNumber, resolvedDest, area, hasFastTrack, aiState]);
