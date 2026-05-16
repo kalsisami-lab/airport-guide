@@ -1,6 +1,6 @@
 // Alliance membership and lounge-access rules.
 // Update when alliance changes are announced (typically months in advance).
-// Last verified: 2025-Q1. Source: official alliance member directories.
+// Last verified: 2026-Q2. Source: official alliance member directories.
 
 export type Alliance = 'oneworld' | 'star-alliance' | 'skyteam';
 export type LoungeClass = 'first' | 'business' | 'standard';
@@ -18,6 +18,8 @@ export const CARRIER_ALLIANCE: Readonly<Record<string, Alliance>> = {
   AY: 'oneworld',  // Finnair
   BA: 'oneworld',  // British Airways
   CX: 'oneworld',  // Cathay Pacific
+  FJ: 'oneworld',  // Fiji Airways
+  HA: 'oneworld',  // Hawaiian Airlines
   IB: 'oneworld',  // Iberia
   JL: 'oneworld',  // Japan Airlines
   MH: 'oneworld',  // Malaysia Airlines
@@ -25,7 +27,9 @@ export const CARRIER_ALLIANCE: Readonly<Record<string, Alliance>> = {
   QR: 'oneworld',  // Qatar Airways
   RJ: 'oneworld',  // Royal Jordanian
   UL: 'oneworld',  // SriLankan Airlines
+  WY: 'oneworld',  // Oman Air
   // ── Star Alliance ────────────────────────────────────────────────────
+  A3: 'star-alliance',  // Aegean Airlines
   AC: 'star-alliance',  // Air Canada
   AI: 'star-alliance',  // Air India
   AV: 'star-alliance',  // Avianca
@@ -51,10 +55,11 @@ export const CARRIER_ALLIANCE: Readonly<Record<string, Alliance>> = {
   TP: 'star-alliance',  // TAP Air Portugal
   UA: 'star-alliance',  // United Airlines
   ZH: 'star-alliance',  // Shenzhen Airlines
+  // ── Star Alliance (continued) ─────────────────────────────────────────
+  AZ: 'star-alliance',  // ITA Airways
   // ── SkyTeam ──────────────────────────────────────────────────────────
   AF: 'skyteam',  // Air France
   AM: 'skyteam',  // Aeroméxico
-  AZ: 'skyteam',  // ITA Airways (formerly Alitalia)
   CZ: 'skyteam',  // China Southern
   DL: 'skyteam',  // Delta Air Lines
   GA: 'skyteam',  // Garuda Indonesia

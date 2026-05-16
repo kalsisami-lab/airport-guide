@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import type { AILounge, AILoungeTier, LoungeNetwork } from '@/lib/aiLounge';
 import { STATUS_ALLIANCE_TIER } from '@/data/allianceRules';
 import { applyHardFilter } from '@/lib/loungeFilter';
-import { LOUNGE_DATABASE, type StaticLounge } from '@/data/loungesData';
+import { getLoungeCandidates, LOUNGE_DATABASE, type StaticLounge } from '@/data/lounges/index';
 
 interface LoungeQuery {
   airportIata: string;
@@ -83,6 +83,7 @@ function resolveNetwork(
       operatingCarrierCode,
       statusAccessMethods,
       cardNetworks,
+      allowedAirlines: lounge.allowedAirlines,
     });
     if (passed.length > 0) return network;
   }
@@ -159,9 +160,8 @@ export async function POST(req: NextRequest) {
   }
 
   const iata = body.airportIata.toUpperCase();
-  const staticData = LOUNGE_DATABASE[iata];
 
-  if (!staticData) {
+  if (!LOUNGE_DATABASE[iata]) {
     // Airport not yet in database — return empty, never 500
     return NextResponse.json({
       lounges: [],
@@ -169,6 +169,14 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  const lounges = resolveStaticLounges(staticData, body);
+  // Use the alliance-isolated router to get only relevant candidates.
+  const candidates = getLoungeCandidates({
+    airportIata: iata,
+    operatingCarrierCode: body.operatingCarrierCode ?? null,
+    statusAccessMethods: body.statusAccessMethods ?? [],
+    hasCard: (body.cardNetworks ?? []).length > 0,
+  });
+
+  const lounges = resolveStaticLounges(candidates, body);
   return NextResponse.json({ lounges });
 }

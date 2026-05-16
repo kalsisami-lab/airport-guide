@@ -10,6 +10,10 @@ interface FilterContext {
   operatingCarrierCode: string | null;  // IATA 2-letter code, null = unknown
   statusAccessMethods: string[];        // raw IDs from AirlineStatus.accessMethods
   cardNetworks: string[];               // e.g. ['priority-pass', 'lounge-key']
+  // Owning/allowed airlines for this specific lounge (from StaticLounge.allowedAirlines).
+  // Used to enforce carrier-level access for airline-own networks:
+  // if the carrier is known, it must appear in this list.
+  allowedAirlines: string[];
 }
 
 const VALID_NETWORKS = new Set<LoungeNetwork>([
@@ -90,10 +94,18 @@ export function applyHardFilter(lounges: AILounge[], ctx: FilterContext): AILoun
       case 'amex-centurion':
         return ctx.cardNetworks.includes('amex-platinum');
 
-      case 'airline-own':
+      case 'airline-own': {
+        // If the operating carrier is known, it must be in the lounge's allowedAirlines.
+        // This is the key guard against cross-alliance leakage (e.g. AY reaching LH lounges).
+        // When carrier is null (unknown) we stay permissive — we can't disprove access.
+        if (ctx.operatingCarrierCode !== null && ctx.allowedAirlines.length > 0) {
+          return ctx.allowedAirlines.includes(ctx.operatingCarrierCode.toUpperCase());
+        }
+        return true;
+      }
+
       case 'independent':
       default:
-        // AI's judgment preserved — these don't follow simple alliance rules
         return true;
     }
   });
