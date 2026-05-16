@@ -1,8 +1,6 @@
 import type { StaticLounge } from './types';
 
-// Hybrid: primary access is oneworld status; also accept Priority Pass.
-// Exported so cardAccess.ts can include them in the card pool without duplication.
-export const HEL_FINNAIR_HYBRID_LOUNGES: StaticLounge[] = [
+const HEL_FINNAIR_LOUNGES: StaticLounge[] = [
   {
     id: 'hel-finnair-lounge-nonschengen',
     name: 'Finnair Lounge',
@@ -12,7 +10,7 @@ export const HEL_FINNAIR_HYBRID_LOUNGES: StaticLounge[] = [
     area: 'non-schengen',
     tier: 'premium',
     loungeClass: 'business',
-    networks: ['oneworld', 'priority-pass'],
+    networks: ['oneworld'],
     allowedAlliances: ['oneworld'],
     allowedAirlines: ['AY'],
     openingHours: 'Daily 05:00–22:00',
@@ -28,7 +26,7 @@ export const HEL_FINNAIR_HYBRID_LOUNGES: StaticLounge[] = [
     area: 'schengen',
     tier: 'premium',
     loungeClass: 'business',
-    networks: ['oneworld', 'priority-pass'],
+    networks: ['oneworld'],
     allowedAlliances: ['oneworld'],
     allowedAirlines: ['AY'],
     openingHours: 'Daily 05:00–22:00',
@@ -55,7 +53,7 @@ export const ONEWORLD_LOUNGES: Readonly<Record<string, StaticLounge[]>> = {
       amenities: ['À la carte dining', 'Premium bar & sommelier', 'Spa & sauna', 'Shower suites', 'Private seating areas', 'High-speed WiFi'],
       gateDistances: { '36': 2, '3': 6, '4': 11, '5': 16 },
     },
-    ...HEL_FINNAIR_HYBRID_LOUNGES,
+    ...HEL_FINNAIR_LOUNGES,
   ],
 
   FRA: [

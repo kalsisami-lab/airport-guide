@@ -174,7 +174,7 @@ export async function POST(req: NextRequest) {
     airportIata: iata,
     operatingCarrierCode: body.operatingCarrierCode ?? null,
     statusAccessMethods: body.statusAccessMethods ?? [],
-    hasCard: (body.cardNetworks ?? []).length > 0,
+    cardNetworks: body.cardNetworks ?? [],
   });
 
   const lounges = resolveStaticLounges(candidates, body);
