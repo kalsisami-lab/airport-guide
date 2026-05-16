@@ -10,14 +10,13 @@ interface FilterContext {
   operatingCarrierCode: string | null;  // IATA 2-letter code, null = unknown
   statusAccessMethods: string[];        // raw IDs from AirlineStatus.accessMethods
   cardNetworks: string[];               // e.g. ['priority-pass', 'lounge-key']
-  // Owning/allowed airlines for this specific lounge (from StaticLounge.allowedAirlines).
-  // Used to enforce carrier-level access for airline-own networks:
-  // if the carrier is known, it must appear in this list.
-  allowedAirlines: string[];
-  // True when the lounge's alliance matches the operating carrier's alliance.
-  // Allows alliance carriers to access partner lounges (e.g. AY at FRA partner lounges)
-  // even when no status card is selected.
-  carrierAllianceAccess?: boolean;
+  allowedAirlines: string[];            // from StaticLounge.allowedAirlines
+  /**
+   * 'all-alliance'    – any carrier in the lounge's alliance + appropriate status tier.
+   * 'carrier-specific' – carrier must be in allowedAirlines + appropriate status tier.
+   * Defaults to 'all-alliance' when the lounge omits the field.
+   */
+  allianceAccess: 'all-alliance' | 'carrier-specific';
 }
 
 const VALID_NETWORKS = new Set<LoungeNetwork>([
@@ -28,31 +27,64 @@ const VALID_NETWORKS = new Set<LoungeNetwork>([
 
 const VALID_CLASSES = new Set<LoungeClass>(['first', 'business', 'standard']);
 
+// Priority used to pick the HIGHEST status tier when multiple methods are supplied.
+// A member who is Finnair Plus Platinum sends both 'finnair-plus-gold' (sapphire) and
+// 'finnair-plus-platinum' (emerald); we must return emerald, not the first match.
+const TIER_PRIORITY: Record<string, number> = {
+  emerald:      4,
+  sapphire:     3,
+  ruby:         1,
+  gold:         3,  // Star Alliance Gold
+  silver:       1,  // Star Alliance Silver
+  'elite-plus': 3,  // SkyTeam Elite Plus
+  elite:        1,  // SkyTeam Elite
+};
+
 function resolveCarrierAlliance(code: string | null): Alliance | null {
   if (!code) return null;
   return CARRIER_ALLIANCE[code.toUpperCase()] ?? null;
 }
 
+/**
+ * Returns the highest-tier STATUS_ALLIANCE_TIER entry found in the methods list.
+ * Previously returned the FIRST match, which caused Platinum members to resolve
+ * to Sapphire because 'finnair-plus-gold' appeared before 'finnair-plus-platinum'.
+ */
 function resolveUserTier(methods: string[]): { alliance: Alliance; tier: string } | null {
+  let best: { alliance: Alliance; tier: string } | null = null;
+  let bestPriority = -1;
   for (const m of methods) {
     const entry = STATUS_ALLIANCE_TIER[m];
-    if (entry) return entry;
+    if (!entry) continue;
+    const priority = TIER_PRIORITY[entry.tier] ?? 0;
+    if (priority > bestPriority) {
+      best = entry;
+      bestPriority = priority;
+    }
   }
-  return null;
+  return best;
 }
 
 /**
  * Applies hard alliance rules on top of the AI-generated lounge list.
  *
  * For alliance lounges (oneworld / star-alliance / skyteam):
- *   1. The operating carrier MUST be in that alliance (when the carrier is known).
- *   2. The user MUST hold status in that alliance.
- *   3. The user's tier MUST grant access to the lounge's class (first / business).
+ *
+ *   allianceAccess = 'all-alliance' (reciprocal partner lounges):
+ *     1. The operating carrier MUST be in that alliance (when the carrier is known).
+ *     2. The user MUST hold status in that alliance.
+ *     3. The user's tier MUST unlock the lounge's class.
+ *
+ *   allianceAccess = 'carrier-specific' (airline's own lounges):
+ *     1. The operating carrier MUST be in allowedAirlines (when the carrier is known).
+ *     2. The user MUST hold status in that alliance.
+ *     3. The user's tier MUST unlock the lounge's class.
  *
  * For card-network lounges (priority-pass / lounge-key / etc.):
  *   User must carry the matching card network.
  *
- * For airline-own and independent lounges the AI's judgment is preserved.
+ * For airline-own / independent lounges:
+ *   Carrier must be in allowedAirlines (used by independent.ts lounges only).
  */
 export function applyHardFilter(lounges: AILounge[], ctx: FilterContext): AILounge[] {
   const carrierAlliance = resolveCarrierAlliance(ctx.operatingCarrierCode);
@@ -65,7 +97,7 @@ export function applyHardFilter(lounges: AILounge[], ctx: FilterContext): AILoun
 
     const loungeClass: LoungeClass = VALID_CLASSES.has(lounge.loungeClass)
       ? lounge.loungeClass
-      : 'business'; // safe default for unknown
+      : 'business';
 
     switch (network) {
       case 'oneworld':
@@ -73,15 +105,20 @@ export function applyHardFilter(lounges: AILounge[], ctx: FilterContext): AILoun
       case 'skyteam': {
         const alliance = network as Alliance;
 
-        // Rule 1: carrier must be in this alliance (only enforced when carrier is known)
-        if (ctx.operatingCarrierCode !== null && carrierAlliance !== alliance) {
-          return false;
+        if (ctx.allianceAccess === 'carrier-specific') {
+          // Carrier must be one of the lounge's allowed airlines.
+          if (ctx.operatingCarrierCode !== null && ctx.allowedAirlines.length > 0) {
+            if (!ctx.allowedAirlines.includes(ctx.operatingCarrierCode.toUpperCase())) return false;
+          }
+        } else {
+          // all-alliance: any carrier in the correct alliance.
+          if (ctx.operatingCarrierCode !== null && carrierAlliance !== alliance) return false;
         }
 
-        // Rule 2: user must have status in this alliance
+        // Status is required for both access modes.
         if (!userTier || userTier.alliance !== alliance) return false;
 
-        // Rule 3: user's tier must unlock this lounge class
+        // Tier must unlock this lounge class (e.g. Ruby grants nothing; Sapphire → business).
         const allowed = (ALLIANCE_TIER_ACCESS[alliance]?.[userTier.tier] ?? []) as LoungeClass[];
         return allowed.includes(loungeClass);
       }
@@ -96,20 +133,12 @@ export function applyHardFilter(lounges: AILounge[], ctx: FilterContext): AILoun
         return ctx.cardNetworks.includes('dragon-pass');
 
       case 'amex-centurion':
-        // Accept both spellings: 'amex-platinum' (from creditCards.loungeAccess)
-        // and 'amex-centurion' (the LoungeNetwork type name).
         return ctx.cardNetworks.includes('amex-platinum') || ctx.cardNetworks.includes('amex-centurion');
 
       case 'airline-own': {
-        // If the operating carrier is known, it must be in the lounge's allowedAirlines —
-        // OR the carrier's alliance matches this lounge's alliance (partner lounge access,
-        // e.g. AY oneworld at FRA accessing JAL/IB/QR partner lounges).
-        // This is the key guard against cross-alliance leakage (e.g. AY reaching LH lounges).
-        // When carrier is null (unknown) we stay permissive — we can't disprove access.
+        // Non-alliance carrier lounges (independent.ts). Carrier must match allowedAirlines.
         if (ctx.operatingCarrierCode !== null && ctx.allowedAirlines.length > 0) {
-          if (ctx.allowedAirlines.includes(ctx.operatingCarrierCode.toUpperCase())) return true;
-          if (ctx.carrierAllianceAccess === true) return true;
-          return false;
+          return ctx.allowedAirlines.includes(ctx.operatingCarrierCode.toUpperCase());
         }
         return true;
       }
