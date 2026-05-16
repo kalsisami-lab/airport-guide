@@ -2,7 +2,7 @@
 // No external API calls are made. Unsupported airports return an empty list.
 import { NextRequest, NextResponse } from 'next/server';
 import type { AILounge, AILoungeTier, LoungeNetwork } from '@/lib/aiLounge';
-import { STATUS_ALLIANCE_TIER } from '@/data/allianceRules';
+import { STATUS_ALLIANCE_TIER, CARRIER_ALLIANCE } from '@/data/allianceRules';
 import { applyHardFilter } from '@/lib/loungeFilter';
 import { getLoungeCandidates, LOUNGE_DATABASE, type StaticLounge } from '@/data/lounges/index';
 
@@ -67,6 +67,18 @@ function resolveNetwork(
   statusAccessMethods: string[],
   cardNetworks: string[],
 ): LoungeNetwork | null {
+  // Determine if the carrier's alliance matches any alliance network on this lounge.
+  // If so, the carrier can access it as a partner lounge (even without status selected).
+  const carrierAlliance = operatingCarrierCode
+    ? (CARRIER_ALLIANCE[operatingCarrierCode.toUpperCase()] ?? null)
+    : null;
+  const loungeAlliances = lounge.networks.filter(
+    (n): n is 'oneworld' | 'star-alliance' | 'skyteam' =>
+      n === 'oneworld' || n === 'star-alliance' || n === 'skyteam',
+  );
+  const carrierAllianceAccess =
+    carrierAlliance !== null && loungeAlliances.includes(carrierAlliance as 'oneworld' | 'star-alliance' | 'skyteam');
+
   for (const network of lounge.networks) {
     const candidate: AILounge = {
       id:           lounge.id,
@@ -84,6 +96,7 @@ function resolveNetwork(
       statusAccessMethods,
       cardNetworks,
       allowedAirlines: lounge.allowedAirlines,
+      carrierAllianceAccess,
     });
     if (passed.length > 0) return network;
   }

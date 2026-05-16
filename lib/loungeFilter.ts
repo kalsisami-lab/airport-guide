@@ -14,6 +14,10 @@ interface FilterContext {
   // Used to enforce carrier-level access for airline-own networks:
   // if the carrier is known, it must appear in this list.
   allowedAirlines: string[];
+  // True when the lounge's alliance matches the operating carrier's alliance.
+  // Allows alliance carriers to access partner lounges (e.g. AY at FRA partner lounges)
+  // even when no status card is selected.
+  carrierAllianceAccess?: boolean;
 }
 
 const VALID_NETWORKS = new Set<LoungeNetwork>([
@@ -97,11 +101,15 @@ export function applyHardFilter(lounges: AILounge[], ctx: FilterContext): AILoun
         return ctx.cardNetworks.includes('amex-platinum') || ctx.cardNetworks.includes('amex-centurion');
 
       case 'airline-own': {
-        // If the operating carrier is known, it must be in the lounge's allowedAirlines.
+        // If the operating carrier is known, it must be in the lounge's allowedAirlines —
+        // OR the carrier's alliance matches this lounge's alliance (partner lounge access,
+        // e.g. AY oneworld at FRA accessing JAL/IB/QR partner lounges).
         // This is the key guard against cross-alliance leakage (e.g. AY reaching LH lounges).
         // When carrier is null (unknown) we stay permissive — we can't disprove access.
         if (ctx.operatingCarrierCode !== null && ctx.allowedAirlines.length > 0) {
-          return ctx.allowedAirlines.includes(ctx.operatingCarrierCode.toUpperCase());
+          if (ctx.allowedAirlines.includes(ctx.operatingCarrierCode.toUpperCase())) return true;
+          if (ctx.carrierAllianceAccess === true) return true;
+          return false;
         }
         return true;
       }

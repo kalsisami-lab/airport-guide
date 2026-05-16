@@ -561,6 +561,63 @@ export const STAR_ALLIANCE_LOUNGES: Readonly<Record<string, StaticLounge[]>> = {
     },
   ],
 
+  HKG: [
+    {
+      id: 'hkg-sq-silverKris-business-t1',
+      name: 'Singapore Airlines SilverKris Business Class Lounge',
+      airportCode: 'HKG',
+      terminal: 'Terminal 1',
+      locationDescription: 'Level 6 — East Hall, near Gates 60–87',
+      area: 'international',
+      tier: 'premium',
+      loungeClass: 'business',
+      networks: ['star-alliance', 'airline-own'],
+      allowedAlliances: ['star-alliance'],
+      allowedAirlines: ['SQ', 'NH', 'LH', 'UA', 'TG', 'AC', 'OZ'],
+      openingHours: 'Daily 06:00–23:00 (operates with SQ departures)',
+      amenities: ['Noodle bar', 'Full buffet', 'Bar', 'Shower suites', 'WiFi', 'Work area'],
+      gateDistances: { '6': 5, '7': 3, '8': 5, '5': 12, '4': 18, '3': 24 },
+    },
+  ],
+
+  DXB: [
+    {
+      id: 'dxb-lh-business-t3',
+      name: 'Lufthansa Business Lounge',
+      airportCode: 'DXB',
+      terminal: 'Terminal 3',
+      locationDescription: 'Level 3 — Concourse B, near Gates B1-B20',
+      area: 'international',
+      tier: 'premium',
+      loungeClass: 'business',
+      networks: ['star-alliance', 'airline-own'],
+      allowedAlliances: ['star-alliance'],
+      allowedAirlines: ['LH', 'LX', 'OS', 'SN', 'NH', 'UA', 'TG', 'SQ', 'AC'],
+      openingHours: 'Daily 07:00–22:00 (operates with LH departures)',
+      amenities: ['Hot buffet', 'Bar', 'Shower rooms', 'WiFi', 'Work desks', 'Business centre'],
+      gateDistances: { 'B': 6, 'A': 14, 'C': 18 },
+    },
+  ],
+
+  CDG: [
+    {
+      id: 'cdg-lh-senator-t1',
+      name: 'Lufthansa Senator Lounge',
+      airportCode: 'CDG',
+      terminal: 'Terminal 1',
+      locationDescription: 'Level 4 — after passport control, satellite S4',
+      area: 'non-schengen',
+      tier: 'premium',
+      loungeClass: 'business',
+      networks: ['star-alliance', 'airline-own'],
+      allowedAlliances: ['star-alliance'],
+      allowedAirlines: ['LH', 'LX', 'OS', 'SN', 'EW', 'NH', 'UA'],
+      openingHours: 'Daily 06:00–21:00 (operates with LH/SN departures)',
+      amenities: ['Hot buffet', 'Bar', 'Shower rooms', 'WiFi', 'Work area'],
+      gateDistances: { 'S4': 5, 'S3': 10, 'S2': 15 },
+    },
+  ],
+
   JNB: [
     {
       id: 'jnb-saa-lounge',
