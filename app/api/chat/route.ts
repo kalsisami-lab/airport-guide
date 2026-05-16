@@ -9,6 +9,16 @@ const SUPPORTED_IATAS = new Set(['HEL', 'LHR', 'AMS', 'ARN', 'FRA', 'CDG', 'HKG'
 function buildSystemPrompt(ctx: ChatContext): string {
   const p: string[] = [];
 
+  // ── Language — must be first so the model always respects it ────────────────
+  p.push(
+    `CRITICAL LANGUAGE RULE — OBEY BEFORE EVERYTHING ELSE: ` +
+    `Detect the language of the traveller's message and reply in that EXACT same language. ` +
+    `Finnish example: "Saako loungessa shampanjaa?" → your ENTIRE reply must be in fluent Finnish. ` +
+    `English example: "Is there champagne?" → reply in English. ` +
+    `Never default to English. Never mix languages. If the message contains Finnish words (ä, ö, å, or words like "saako", "onko", "loungessa"), it IS Finnish — reply in Finnish. ` +
+    `When replying in Finnish, use natural everyday Finnish — not formal or stilted language.`,
+  );
+
   // ── Role & style ────────────────────────────────────────────────────────────
   p.push(
     `You are an expert airport concierge and lounge access specialist embedded in a mobile airport guide app. ` +
@@ -16,7 +26,6 @@ function buildSystemPrompt(ctx: ChatContext): string {
     `CRITICAL: Always read and directly answer the traveller's exact question. ` +
     `If they ask about a specific feature (champagne, food, showers, wifi, children's area, etc.), look it up in the LOUNGE AMENITIES section below and answer specifically. ` +
     `Do NOT default to reciting their lounge access summary — they already see that on screen. ` +
-    `LANGUAGE: Always respond in the same language the traveller uses. If they write in Finnish, reply in Finnish. If in English, reply in English. Never switch languages. ` +
     `Answer in 2–4 sentences of plain text. No markdown, no bullet points, no headers. ` +
     `Be precise, practical, and friendly — the traveller is at the airport right now.`,
   );
@@ -186,16 +195,28 @@ function simulate(userMessage: string, ctx: ChatContext): string {
   const isChildren  = /child|kid|baby|family|lapsi|perhe/i.test(userMessage);
   const isWork      = /work|desk|business.cent|laptop|office|työ/i.test(userMessage);
 
+  const isFinnish = /[äöåÄÖÅ]/.test(userMessage) ||
+    /\b(saako|onko|voiko|missä|milloin|loungessa|shampanjaa|ruokaa|suihku|hieronta|pääsy|pääsen|kyllä|kuinka|paljonko|miten)\b/i.test(userMessage);
+
   if (isChampagne || isBar) {
     if (hasLounges) {
       const hasChamp = amenityHas(amenities, 'champagne');
       const hasBar   = amenityHas(amenities, 'bar', 'cocktail', 'spirits', 'premium bar');
       if (isChampagne) {
+        if (isFinnish) {
+          if (hasChamp) return `Kyllä — ${bestLounge.name} tarjoaa samppanjaa premium-baarissaan. Sitä on vapaasti tarjolla baarissa aukioloaikoina.`;
+          if (hasBar)   return `${bestLounge.name}ssa on täysi baari viineineen ja tislatuine juomineen, mutta samppanjaa ei ole erikseen mainittu palvelulistalla — kannattaa tiedustella henkilökunnalta.`;
+          return `Samppanjaa ei ole mainittu loungesi palveluissa${ctx.airport ? ` ${ctx.airport}ssa` : ''}. Kuplajuomaa saattaa silti löytyä baarista — kysy tiskiltä.`;
+        }
         if (hasChamp) return `Yes — ${bestLounge.name} offers champagne as part of its premium bar. It's available to help yourself at the bar area during opening hours.`;
         if (hasBar)   return `${bestLounge.name} has a full bar with wines and spirits, but champagne isn't specifically listed in the amenities — ask staff at the bar when you arrive.`;
         return `Champagne isn't listed in the amenities for your accessible lounge${ctx.airport ? ` at ${ctx.airport}` : ''}. The bar may still have sparkling wine — worth asking at the counter.`;
       }
       // General bar question
+      if (isFinnish) {
+        if (hasBar) return `Kyllä — ${bestLounge.name}ssa on baari${amenityHas(amenities, 'cocktail') ? ', myös cocktaileja' : ''}. Juomat ovat maksuttomia vierailun aikana.`;
+        return `${bestLounge.name}ssa on juomapalvelu, mutta täyttä baaria ei ole erikseen mainittu — kevyitä juomia ja alkoholittomia vaihtoehtoja on yleensä tarjolla kaikissa loungeissa.`;
+      }
       if (hasBar) return `Yes — ${bestLounge.name} has a bar serving drinks${amenityHas(amenities, 'cocktail') ? ', including cocktails' : ''}. It's complimentary during your visit.`;
       return `${bestLounge.name} has beverage service but a full bar isn't specifically listed — light drinks and non-alcoholic options are typically available in all lounges.`;
     }
@@ -205,6 +226,11 @@ function simulate(userMessage: string, ctx: ChatContext): string {
     if (hasLounges) {
       const hasAlaCarte = amenityHas(amenities, 'à la carte', 'a la carte', 'dining', 'restaurant', 'chef');
       const hasBuffet   = amenityHas(amenities, 'buffet');
+      if (isFinnish) {
+        if (hasAlaCarte) return `${bestLounge.name} tarjoaa à la carte -ruokailun — voit tilata listalta buffet-pöydän sijaan. Erinomainen vaihtoehto kunnon aterialle ennen lentoa.`;
+        if (hasBuffet)   return `${bestLounge.name}ssa on lämmin ja kylmä buffet. Ruoka on itsepalvelua ja täydennetään aukioloaikoina — hyvä vaihtoehto pikaiselle aterialle tai välipaloille.`;
+        return `${bestLounge.name}ssa on välipaloja ja kevyttä ruokaa tarjolla. Tarkista valikko saapuessasi loungeen.`;
+      }
       if (hasAlaCarte) return `${bestLounge.name} offers à la carte dining — you can order from a menu rather than just a buffet. A great option for a proper meal before your flight.`;
       if (hasBuffet)   return `${bestLounge.name} has a hot and cold buffet. Food is self-serve and replenished throughout opening hours — good for a quick meal or snacks.`;
       return `Light food and snacks are available at ${bestLounge.name}. For a full meal, check the lounge's menu board when you arrive.`;
@@ -214,6 +240,10 @@ function simulate(userMessage: string, ctx: ChatContext): string {
   if (isShower) {
     if (hasLounges) {
       const hasShower = amenityHas(amenities, 'shower');
+      if (isFinnish) {
+        if (hasShower) return `Kyllä — ${bestLounge.name}ssa on suihkuhuoneet. Pyyhkeet ja tarvikkeet kuuluvat hintaan; kysy vastaanotosta vuorolistaa, sillä suihkut voivat olla varattuja.`;
+        return `Suihkua ei ole mainittu ${bestLounge.name}n palveluissa. Kysy henkilökunnalta — joissakin loungeissa on tiloja, joita ei ole listattu verkossa.`;
+      }
       if (hasShower) return `Yes — ${bestLounge.name} has shower suites available. Towels and toiletries are provided; you may need to request a slot at the reception desk as demand can be high.`;
       return `Showers aren't listed in the amenities for ${bestLounge.name}. If you need a shower, ask staff when you arrive — some lounges have facilities not shown online.`;
     }
@@ -222,6 +252,10 @@ function simulate(userMessage: string, ctx: ChatContext): string {
   if (isSpa) {
     if (hasLounges) {
       const hasSpa = amenityHas(amenities, 'spa', 'massage', 'sauna');
+      if (isFinnish) {
+        if (hasSpa) return `Kyllä — ${bestLounge.name}ssa on kylpylä- tai hyvinvointipalveluja. Nämä ovat loungen kohokohta; varaa tai pyydä aikaa heti vastaanotosta.`;
+        return `Kylpylä- tai hierontapalveluja ei ole mainittu ${bestLounge.name}lle. Loungessa on kuitenkin mukavat lepotilat ja suihkutilat.`;
+      }
       if (hasSpa) return `Yes — ${bestLounge.name} has spa or wellness facilities. These are a highlight of the lounge; book or request a slot at reception as soon as you arrive.`;
       return `Spa or massage services aren't listed for ${bestLounge.name}. The lounge still offers shower facilities and a comfortable rest area.`;
     }
@@ -230,6 +264,10 @@ function simulate(userMessage: string, ctx: ChatContext): string {
   if (isWifi) {
     if (hasLounges) {
       const hasWifi = amenityHas(amenities, 'wifi', 'wi-fi', 'internet');
+      if (isFinnish) {
+        if (hasWifi) return `Kyllä — ${bestLounge.name}ssa on nopea WiFi. Salasana on yleensä vastaanotossa tai pöydillä loungetiloissa.`;
+        return `WiFi:tä ei ole vahvistettu ${bestLounge.name}lle, mutta käytännössä kaikissa lentokenttäloungeissa on se — kysy salasana henkilökunnalta.`;
+      }
       if (hasWifi) return `Yes — ${bestLounge.name} has high-speed WiFi. The password is usually on a card at the reception desk or on tables throughout the lounge.`;
       return `WiFi availability isn't confirmed for ${bestLounge.name}, but virtually all airport lounges offer it — ask staff for the network name and password.`;
     }
@@ -238,6 +276,10 @@ function simulate(userMessage: string, ctx: ChatContext): string {
   if (isChildren) {
     if (hasLounges) {
       const hasKids = amenityHas(amenities, "children's", 'kids', 'family', 'play');
+      if (isFinnish) {
+        if (hasKids) return `Kyllä — ${bestLounge.name}ssa on lasten- tai perhetilat. Hyvä vaihtoehto lasten kanssa matkustaville.`;
+        return `Erillistä lastenhuonetta ei ole mainittu ${bestLounge.name}lle, mutta perheet ovat tervetulleita — loungessa on mukavat istumapaikat ja lapsille sopivaa ruokaa.`;
+      }
       if (hasKids) return `Yes — ${bestLounge.name} has a children's area or family facilities. A great option if you're travelling with kids.`;
       return `A dedicated children's area isn't listed for ${bestLounge.name}, but families are welcome — the lounge will have comfortable seating and food options suitable for children.`;
     }
@@ -246,6 +288,10 @@ function simulate(userMessage: string, ctx: ChatContext): string {
   if (isWork) {
     if (hasLounges) {
       const hasWork = amenityHas(amenities, 'work', 'desk', 'business centre', 'station');
+      if (isFinnish) {
+        if (hasWork) return `Kyllä — ${bestLounge.name}ssa on työskentelypisteet ja toimistotilat. Etsi erillinen työskentelyalue, joka on yleensä hiljaisempi kuin päälounge.`;
+        return `Erillisiä työskentelypisteitä ei ole mainittu ${bestLounge.name}lle, mutta kaikissa loungeissa on istumapaikkoja ja pistorasioita kannettavaa varten.`;
+      }
       if (hasWork) return `Yes — ${bestLounge.name} has work desks and business facilities. Look for the dedicated workstation area, usually quieter than the main lounge space.`;
       return `Dedicated work desks aren't specifically listed for ${bestLounge.name}, but all lounges have seating with power outlets — suitable for laptop work.`;
     }
@@ -260,6 +306,11 @@ function simulate(userMessage: string, ctx: ChatContext): string {
   if (isAccessQuestion) {
     if (hasLounges) {
       const others   = accessible.slice(1).map((l) => l.name);
+      if (isFinnish) {
+        const otherStr = others.length > 0 ? ` Sinulla on myös pääsy seuraaviin: ${others.join(', ')}.` : '';
+        const airportStr = ctx.airport ? ` ${ctx.airport}ssa` : '';
+        return `Paras loungesi${airportStr} on ${bestLounge.name} (${bestLounge.tier.replace('-', ' ')}) — pääsy ${bestLounge.reason}lla.${otherStr} Saavu loungeen noin 90 minuuttia ennen lähtöä ja näytä boarding pass tai statuskortti.`;
+      }
       const otherStr = others.length > 0 ? ` You also have access to ${others.join(', ')}.` : '';
       const airportStr = ctx.airport ? ` at ${ctx.airport}` : '';
       return `Your top lounge${airportStr} is ${bestLounge.name} (${bestLounge.tier.replace('-', ' ')}) via your ${bestLounge.reason}.${otherStr} Head to the lounge about 90 minutes before departure and show your boarding pass or status card.`;
@@ -268,20 +319,31 @@ function simulate(userMessage: string, ctx: ChatContext): string {
       const { tier } = ctx.allianceAccess;
       const partners = alliancePartners[ctx.allianceAccess.alliance] ?? 'partner carrier lounges';
       const classAccess = tier === 'Emerald' ? 'both First Class and Business Class lounges' : 'Business Class lounges';
+      if (isFinnish) {
+        const classAccessFI = tier === 'Emerald' ? 'sekä First Class- että Business Class -loungeihin' : 'Business Class -loungeihin';
+        return `${allianceName} ${tier} -jäsenenä${ctx.airport ? ` ${ctx.airport}ssa` : ''} sinulla on pääsy ${classAccessFI} kaikilla ${allianceName}-lentoasemilla lennettäessä ${allianceName}-lentoyhtiöllä. Näytä jäsenkorttisi vastaanottoon.`;
+      }
       return `As a ${allianceName} ${tier} member${ctx.airport ? ` at ${ctx.airport}` : ''}, you can access ${classAccess} at any ${allianceName} partner airport when flying a ${allianceName} carrier. Look for ${partners} lounges — show your membership card at reception.`;
     }
     if (ctx.airportIata === 'HKG') {
-      return 'At HKG, the Cathay Pacific lounges (The Wing, The Pier) are accessible with oneworld Sapphire or Emerald status. Plaza Premium accepts Priority Pass at three locations across T1.';
+      return isFinnish
+        ? 'HKG:ssä Cathay Pacificin loungit (The Wing, The Pier) ovat käytettävissä oneworld Sapphire- tai Emerald-statuksella. Plaza Premium hyväksyy Priority Passin kolmessa sijainnissa T1:ssä.'
+        : 'At HKG, the Cathay Pacific lounges (The Wing, The Pier) are accessible with oneworld Sapphire or Emerald status. Plaza Premium accepts Priority Pass at three locations across T1.';
     }
-    return 'Select your credit card or airline status above and I can tell you exactly which lounges you can access.';
+    return isFinnish
+      ? 'Valitse kortti tai lentoyhtiöstatus yllä, niin kerron täsmälleen mihin loungeihin sinulla on pääsy.'
+      : 'Select your credit card or airline status above and I can tell you exactly which lounges you can access.';
   }
 
   // ── Fast Track / security ───────────────────────────────────────────────────
-  if (/fast.?track|security|queue|lane/i.test(userMessage)) {
+  if (/fast.?track|security|queue|lane|turvatarkastus|jono/i.test(userMessage)) {
     if (ctx.fastTrack) {
       const suffix = ctx.allianceAccess ? ` as a ${allianceName} ${ctx.allianceAccess.tier} member` : '';
+      const suffixFI = ctx.allianceAccess ? ` ${allianceName} ${ctx.allianceAccess.tier} -jäsenenä` : '';
+      if (isFinnish) return `Kyllä — sinulla on Fast Track -oikeus${ctx.airport ? ` ${ctx.airport}ssa` : ''}${suffixFI}. Etsi erillinen Fast Track -kaista turvatarkastuksessa — se on yleensä erikseen opastettu.`;
       return `Yes — you have Fast Track access${ctx.airport ? ` at ${ctx.airport}` : ''}${suffix}. Look for the dedicated Fast Track lane at security, usually signposted separately from the main queue.`;
     }
+    if (isFinnish) return `Fast Trackia ei ole vahvistettu nykyisillä tiedoillasi${ctx.airport ? ` ${ctx.airport}ssa` : ''}. Varaa vähintään 30–40 minuuttia tavalliseen turvatarkastukseen.`;
     return `Fast Track isn't confirmed for your current setup${ctx.airport ? ` at ${ctx.airport}` : ''}. Allow at least 30–40 minutes for standard security.`;
   }
 
@@ -291,19 +353,27 @@ function simulate(userMessage: string, ctx: ChatContext): string {
   }
 
   // ── Walking / gate ──────────────────────────────────────────────────────────
-  if (/\bgate\b|walk|distance|how far/i.test(userMessage)) {
+  if (/\bgate\b|walk|distance|how far|portti|kävelyaika/i.test(userMessage)) {
     if (ctx.gate) {
-      return `You're at Gate ${ctx.gate}. Walking times are shown in the app for each lounge — check the lounge cards above.`;
+      return isFinnish
+        ? `Olet portilla ${ctx.gate}. Kävelyajat ovat näkyvissä sovelluksessa kunkin loungekortin yhteydessä.`
+        : `You're at Gate ${ctx.gate}. Walking times are shown in the app for each lounge — check the lounge cards above.`;
     }
-    return "Enter your gate number in the app and I'll show walking time estimates to each lounge.";
+    return isFinnish
+      ? 'Syötä porttinumero sovellukseen ja näytän arvioidut kävelyajat kuhunkin loungeen.'
+      : "Enter your gate number in the app and I'll show walking time estimates to each lounge.";
   }
 
   // ── Fallback ────────────────────────────────────────────────────────────────
   if (ctx.allianceAccess && allianceName && ctx.airport) {
-    return `At ${ctx.airport}, use your ${allianceName} ${ctx.allianceAccess.tier} status to access partner lounges. Ask me specifically about lounges, fast track, food, drinks, or any other feature.`;
+    return isFinnish
+      ? `${ctx.airport}ssa voit käyttää ${allianceName} ${ctx.allianceAccess.tier} -statustasi kumppaniloungeihin. Kysy vaikka loungesta, fast trackista, ruuasta, juomista tai muista palveluista.`
+      : `At ${ctx.airport}, use your ${allianceName} ${ctx.allianceAccess.tier} status to access partner lounges. Ask me specifically about lounges, fast track, food, drinks, or any other feature.`;
   }
 
-  return `I'm your airport assistant${ctx.airport ? ` for ${ctx.airport}` : ''}. Ask me about lounges, fast track, champagne, food, showers, or any travel tip.`;
+  return isFinnish
+    ? `Olen lentoasemaavustajasi${ctx.airport ? ` ${ctx.airport}ssa` : ''}. Kysy loungesta, fast trackista, samppanjasta, ruuasta, suihkutiloista tai muista matkavinkistä.`
+    : `I'm your airport assistant${ctx.airport ? ` for ${ctx.airport}` : ''}. Ask me about lounges, fast track, champagne, food, showers, or any travel tip.`;
 }
 
 // ── Route handler ─────────────────────────────────────────────────────────────

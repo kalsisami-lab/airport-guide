@@ -13,6 +13,8 @@ import { creditCards, type CreditCard } from '@/data/creditCards';
 import { airlineStatuses, type AirlineStatus } from '@/data/airlineStatuses';
 import { destinationsByAirport, type Destination } from '@/data/destinations';
 import { parseAirlineCode } from '@/lib/eligibility';
+import { CARRIER_ALLIANCE } from '@/data/allianceRules';
+import { getFlightDirectionHint } from '@/lib/flightDirection';
 import { useFlightLookup } from '@/hooks/useFlightLookup';
 import { useGlobalFlightSearch } from '@/hooks/useGlobalFlightSearch';
 import { useAILounges } from '@/hooks/useAILounges';
@@ -123,6 +125,7 @@ export default function Dashboard() {
   );
 
   const airlineCode = parseAirlineCode(flightNumber);
+  const flightAlliance = airlineCode ? (CARRIER_ALLIANCE[airlineCode.toUpperCase()] ?? null) : null;
   // Effective key: user's locally stored key, or a sentinel when the server has one configured
   const effectiveFlightKey = flightApiKey ?? (serverHasFlightKey ? '__server__' : null);
 
@@ -202,8 +205,17 @@ export default function Dashboard() {
         }
       }
     } else if (flightState.status === 'loading' && !airportManuallySet) {
-      const hub = AIRLINE_HUB[airlineCode];
-      if (hub) setAirportIata(hub);
+      // Use direction heuristic: only pre-fill the hub when the flight is OUTBOUND from it.
+      // For inbound (even) flights the hub is the destination, not where the user is now.
+      const hint = getFlightDirectionHint(flightNumber);
+      if (hint) {
+        if (hint.isOutbound) setAirportIata(hint.hubIata);
+        // isOutbound=false → user is arriving at hub, don't pre-fill; wait for flight resolve
+      } else {
+        // Unknown carrier — fall back to hub map without direction check
+        const hub = AIRLINE_HUB[airlineCode];
+        if (hub) setAirportIata(hub);
+      }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [flightState, globalState, airlineCode, airportManuallySet]);
@@ -372,30 +384,7 @@ export default function Dashboard() {
         {/* Inputs */}
         <section className="space-y-5">
 
-          {/* ── 1. Identity ─────────────────────────────────────────────── */}
-          <div className="space-y-3">
-            <h2 className="text-xs font-bold uppercase tracking-widest text-slate-500">Your Identity</h2>
-
-            <SelectInput
-              label="Credit Card"
-              placeholder="Select your card…"
-              options={cardOptions}
-              value={cardId}
-              onChange={setCardId}
-              icon="💳"
-            />
-
-            <SelectInput
-              label="Airline Status"
-              placeholder="Select your status…"
-              options={statusOptions}
-              value={statusId}
-              onChange={setStatusId}
-              icon="✈️"
-            />
-          </div>
-
-          {/* ── 2. Flight ────────────────────────────────────────────────── */}
+          {/* ── 1. Flight ────────────────────────────────────────────────── */}
           <div className="space-y-3">
             <h2 className="text-xs font-bold uppercase tracking-widest text-slate-500">Your Flight</h2>
 
@@ -572,6 +561,44 @@ export default function Dashboard() {
                 icon="🌍"
               />
             )}
+          </div>
+
+          {/* ── 2. Profile ───────────────────────────────────────────────── */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <h2 className="text-xs font-bold uppercase tracking-widest text-slate-500">Your Profile</h2>
+              {rawFlight && flightAlliance && (
+                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-400 capitalize">
+                  Flying {flightAlliance}
+                </span>
+              )}
+            </div>
+
+            {rawFlight && !card && !status && (
+              <div className="rounded-xl bg-blue-500/10 border border-blue-500/20 px-4 py-3">
+                <p className="text-blue-300 text-sm">
+                  Add your card or status to see which lounges you can access with this flight.
+                </p>
+              </div>
+            )}
+
+            <SelectInput
+              label="Credit Card"
+              placeholder="Select your card…"
+              options={cardOptions}
+              value={cardId}
+              onChange={setCardId}
+              icon="💳"
+            />
+
+            <SelectInput
+              label="Airline Status"
+              placeholder="Select your status…"
+              options={statusOptions}
+              value={statusId}
+              onChange={setStatusId}
+              icon="✈️"
+            />
           </div>
 
           {/* ── 3. Location (confirmation fields) ───────────────────────── */}
@@ -752,7 +779,7 @@ export default function Dashboard() {
               </svg>
             </div>
             <p className="text-slate-400 text-sm">
-              Select an airport, then enter your card, status, or flight number to see lounge access and Fast Track eligibility.
+              Enter your flight number to get started, then add your card or airline status to see lounge access and Fast Track eligibility.
             </p>
           </section>
         )}
