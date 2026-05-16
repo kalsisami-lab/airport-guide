@@ -1,6 +1,6 @@
 // Static lounge database — ground truth for supported airports.
 // To add a new airport: append a section below and add the key to LOUNGE_DATABASE.
-// Last reviewed: 2025-Q2.
+// Last reviewed: 2026-Q2.
 
 import type { LoungeNetwork, LoungeClass, AILoungeTier } from '@/lib/aiLounge';
 
@@ -114,16 +114,20 @@ const HEL: StaticLounge[] = [
 // ──────────────────────────────────────────────────────────────────────────────
 // FRANKFURT AM MAIN (FRA)
 //
-// Terminal 1 (Star Alliance / Lufthansa hub):
-//   Concourse A — Schengen      — gates A01-A26 (strip letter → 1-26)
-//   Concourse B — Non-Schengen  — gates B44-B88 (strip letter → 44-88)
-//   Concourse C — Non-Schengen  — gates C101-C116 (strip letter → 101-116)
+// Terminal 1 (Lufthansa / Star Alliance hub):
+//   Concourse A — Schengen      — gates A01-A26
+//   Concourse B — Non-Schengen  — gates B44-B88
+//   Concourse C — Non-Schengen  — gates C101-C116
 //   Concourse Z — Schengen      — gates Z01-Z09 (shuttle to Munich)
 // Terminal 2 (SkyTeam / Air France hub):
 //   Concourse D/E               — gates D01-D26, E01-E22
 //
 // gateDistances keys: gate letter prefix ('A', 'B', 'C', 'Z', 'D', 'E').
 // Users entering FRA gates should include the letter (e.g. "A14", "B72").
+//
+// Alliance lounge seating at FRA T1:
+//   Star Alliance Gold → Lufthansa Senator Lounges (A Schengen / B Non-Schengen)
+//   oneworld Sapphire/Emerald → JAL Sakura, Iberia, Qatar Airlines lounges (Concourse B)
 // ──────────────────────────────────────────────────────────────────────────────
 const FRA: StaticLounge[] = [
   {
@@ -209,6 +213,70 @@ const FRA: StaticLounge[] = [
     gateDistances: { 'A': 5, 'Z': 8 },
   },
   {
+    id: 'fra-jal-sakura',
+    name: 'Japan Airlines Sakura Lounge',
+    airportCode: 'FRA',
+    terminal: 'Terminal 1',
+    locationDescription: 'Concourse B, Level 2 — Non-Schengen (near Gate B18)',
+    area: 'non-schengen',
+    tier: 'premium',
+    loungeClass: 'business',
+    networks: ['oneworld', 'airline-own'],
+    allowedAlliances: ['oneworld'],
+    allowedAirlines: ['JL'],
+    openingHours: 'Daily 09:00–15:00 (operates with JL departures)',
+    amenities: ['Japanese cuisine', 'Bar', 'Shower rooms', 'WiFi', 'Quiet seating'],
+    gateDistances: { 'B': 6, 'C': 11, 'A': 19, 'Z': 23 },
+  },
+  {
+    id: 'fra-iberia-sala-vip',
+    name: 'Iberia Sala VIP Lounge',
+    airportCode: 'FRA',
+    terminal: 'Terminal 1',
+    locationDescription: 'Concourse B, Level 2 — Non-Schengen',
+    area: 'non-schengen',
+    tier: 'premium',
+    loungeClass: 'business',
+    networks: ['oneworld', 'airline-own'],
+    allowedAlliances: ['oneworld'],
+    allowedAirlines: ['IB'],
+    openingHours: 'Daily 07:00–15:00 (operates with IB departures)',
+    amenities: ['Buffet', 'Bar', 'WiFi', 'Work area'],
+    gateDistances: { 'B': 7, 'C': 12, 'A': 18, 'Z': 22 },
+  },
+  {
+    id: 'fra-qatar-airways',
+    name: 'Qatar Airways Business Lounge',
+    airportCode: 'FRA',
+    terminal: 'Terminal 1',
+    locationDescription: 'Concourse B, Level 2 — Non-Schengen (near Gate B44)',
+    area: 'non-schengen',
+    tier: 'premium',
+    loungeClass: 'business',
+    networks: ['oneworld', 'airline-own'],
+    allowedAlliances: ['oneworld'],
+    allowedAirlines: ['QR'],
+    openingHours: 'Daily 08:00–16:00 (operates with QR departures)',
+    amenities: ['À la carte dining', 'Premium bar', 'Shower rooms', 'WiFi', 'Work area'],
+    gateDistances: { 'B': 5, 'C': 10, 'A': 19, 'Z': 23 },
+  },
+  {
+    id: 'fra-asiana-business',
+    name: 'Asiana Airlines Business Class Lounge',
+    airportCode: 'FRA',
+    terminal: 'Terminal 1',
+    locationDescription: 'Concourse B, Level 2 — Non-Schengen',
+    area: 'non-schengen',
+    tier: 'premium',
+    loungeClass: 'business',
+    networks: ['star-alliance', 'airline-own'],
+    allowedAlliances: ['star-alliance'],
+    allowedAirlines: ['OZ'],
+    openingHours: 'Daily 10:00–16:00 (operates with OZ departures)',
+    amenities: ['Korean buffet', 'Bar', 'WiFi', 'Work area'],
+    gateDistances: { 'B': 6, 'C': 11, 'A': 18, 'Z': 22 },
+  },
+  {
     id: 'fra-airfrance-t2',
     name: 'Air France Lounge',
     airportCode: 'FRA',
@@ -263,12 +331,18 @@ const FRA: StaticLounge[] = [
 //
 // All flights are international — no Schengen-equivalent zone split.
 // Terminal / gate mapping:
-//   Terminal 1 → A gates (A01-A22)
-//   Terminal 2 → B gates (B01-B34)
-//   Terminal 3 → C gates (C01-C22) and D gates (D01-D22)
-//   Terminal 4 → E gates (E01-E30)
+//   Terminal 1 → A gates (A01-A22)  — oneworld & misc. carriers
+//   Terminal 2 → B gates (B01-B34)  — Star Alliance (TG, GA, etc.)
+//   Terminal 3 → C gates (C01-C22) and D gates (D01-D22) — SQ main hub
+//   Terminal 4 → E gates (E01-E30)  — low-cost and select carriers
 //
 // gateDistances keys: gate letter prefix ('A', 'B', 'C', 'D', 'E').
+//
+// Key airline→terminal mapping:
+//   T1: BA, CX, QF, MH, JL, AC, UL and other oneworld/independent carriers
+//   T2: TG (Thai), GA (Garuda), KE (Korean Air), SQ (select routes)
+//   T3: SQ (primary), LH, TK, NH, UA (Star Alliance partners)
+//   T4: AK (AirAsia), FD, QG (Citilink)
 // ──────────────────────────────────────────────────────────────────────────────
 const SIN: StaticLounge[] = [
   {
@@ -280,7 +354,6 @@ const SIN: StaticLounge[] = [
     area: 'international',
     tier: 'ultra-premium',
     loungeClass: 'first',
-    // Accessible to SA Gold when flying SQ in First/Suites; or KrisFlyer Elite Gold
     networks: ['star-alliance', 'airline-own'],
     allowedAlliances: ['star-alliance'],
     allowedAirlines: ['SQ'],
@@ -367,6 +440,70 @@ const SIN: StaticLounge[] = [
     openingHours: 'Daily 06:00–23:00 (hours vary with QF departures)',
     amenities: ['À la carte dining', 'Bar', 'Shower rooms', 'WiFi', 'Work area', 'Children\'s zone'],
     gateDistances: { 'A': 5, 'B': 12, 'C': 18, 'D': 20, 'E': 26 },
+  },
+  {
+    id: 'sin-british-airways-t1',
+    name: 'British Airways Lounge',
+    airportCode: 'SIN',
+    terminal: 'Terminal 1',
+    locationDescription: 'Level 3 — near Gates A12-A18',
+    area: 'international',
+    tier: 'premium',
+    loungeClass: 'business',
+    networks: ['oneworld', 'airline-own'],
+    allowedAlliances: ['oneworld'],
+    allowedAirlines: ['BA'],
+    openingHours: 'Daily 08:00–18:00 (operates with BA departures)',
+    amenities: ['À la carte dining', 'Premium bar', 'Shower rooms', 'WiFi', 'Work desks'],
+    gateDistances: { 'A': 6, 'B': 13, 'C': 18, 'D': 20, 'E': 27 },
+  },
+  {
+    id: 'sin-cathay-skyview-t1',
+    name: 'Cathay Pacific The Pier Business Class Lounge',
+    airportCode: 'SIN',
+    terminal: 'Terminal 1',
+    locationDescription: 'Level 2 — near Gates A6-A14',
+    area: 'international',
+    tier: 'premium',
+    loungeClass: 'business',
+    networks: ['oneworld', 'airline-own'],
+    allowedAlliances: ['oneworld'],
+    allowedAirlines: ['CX'],
+    openingHours: 'Daily 07:00–22:00 (operates with CX departures)',
+    amenities: ['Hot buffet', 'Noodle bar', 'Bar', 'Shower rooms', 'WiFi', 'Work stations'],
+    gateDistances: { 'A': 5, 'B': 12, 'C': 18, 'D': 20, 'E': 26 },
+  },
+  {
+    id: 'sin-malaysia-golden-t1',
+    name: 'Malaysia Airlines Golden Lounge',
+    airportCode: 'SIN',
+    terminal: 'Terminal 1',
+    locationDescription: 'Level 3 — near Gates A20-A22',
+    area: 'international',
+    tier: 'premium',
+    loungeClass: 'business',
+    networks: ['oneworld', 'airline-own'],
+    allowedAlliances: ['oneworld'],
+    allowedAirlines: ['MH'],
+    openingHours: 'Daily 06:00–22:00 (operates with MH departures)',
+    amenities: ['Malaysian cuisine buffet', 'Bar', 'Shower rooms', 'WiFi', 'Prayer room'],
+    gateDistances: { 'A': 7, 'B': 13, 'C': 18, 'D': 20, 'E': 26 },
+  },
+  {
+    id: 'sin-thai-royal-orchid-t2',
+    name: 'Thai Airways Royal Orchid Lounge',
+    airportCode: 'SIN',
+    terminal: 'Terminal 2',
+    locationDescription: 'Level 3 — near Gates B22-B30',
+    area: 'international',
+    tier: 'premium',
+    loungeClass: 'business',
+    networks: ['star-alliance', 'airline-own'],
+    allowedAlliances: ['star-alliance'],
+    allowedAirlines: ['TG'],
+    openingHours: 'Daily 08:00–16:00 (operates with TG departures)',
+    amenities: ['Thai cuisine buffet', 'Bar', 'Shower rooms', 'WiFi', 'Relaxation area'],
+    gateDistances: { 'B': 5, 'A': 10, 'C': 13, 'D': 15, 'E': 22 },
   },
   {
     id: 'sin-sats-premier-t3',
