@@ -7,16 +7,14 @@ export { ONEWORLD_LOUNGES } from './oneworld';
 export { STAR_ALLIANCE_LOUNGES } from './starAlliance';
 export { SKYTEAM_LOUNGES } from './skyteam';
 export { INDEPENDENT_LOUNGES } from './independent';
-export { AMEX_LOUNGES } from '../amexData';
-export { PRIORITY_PASS_LOUNGES } from '../priorityPassData';
+export { AMEX_LOUNGES, PRIORITY_PASS_LOUNGES } from '../cardAndPerksData';
 
 import type { StaticLounge } from './types';
 import { ONEWORLD_LOUNGES } from './oneworld';
 import { STAR_ALLIANCE_LOUNGES } from './starAlliance';
 import { SKYTEAM_LOUNGES } from './skyteam';
 import { INDEPENDENT_LOUNGES } from './independent';
-import { AMEX_LOUNGES } from '../amexData';
-import { PRIORITY_PASS_LOUNGES } from '../priorityPassData';
+import { AMEX_LOUNGES, PRIORITY_PASS_LOUNGES } from '../cardAndPerksData';
 import { CARRIER_ALLIANCE, STATUS_ALLIANCE_TIER } from '@/data/allianceRules';
 import type { Alliance } from '@/data/allianceRules';
 
@@ -76,8 +74,10 @@ export function getLoungeCandidates({
     pool.push(...(SKYTEAM_LOUNGES[iata] ?? []));
   }
 
-  // Card lounges — searched simultaneously, independent of alliance
-  if (cardNetworks.includes('amex-centurion')) {
+  // Card lounges — searched simultaneously, independent of alliance.
+  // Accept both 'amex-platinum' (sent by creditCards.ts loungeAccess) and
+  // 'amex-centurion' (the LoungeNetwork name used in lounge data).
+  if (cardNetworks.some((n) => n === 'amex-platinum' || n === 'amex-centurion')) {
     pool.push(...(AMEX_LOUNGES[iata] ?? []));
   }
   if (cardNetworks.some((n) => PP_NETWORKS.has(n))) {

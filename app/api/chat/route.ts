@@ -16,6 +16,7 @@ function buildSystemPrompt(ctx: ChatContext): string {
     `CRITICAL: Always read and directly answer the traveller's exact question. ` +
     `If they ask about a specific feature (champagne, food, showers, wifi, children's area, etc.), look it up in the LOUNGE AMENITIES section below and answer specifically. ` +
     `Do NOT default to reciting their lounge access summary — they already see that on screen. ` +
+    `LANGUAGE: Always respond in the same language the traveller uses. If they write in Finnish, reply in Finnish. If in English, reply in English. Never switch languages. ` +
     `Answer in 2–4 sentences of plain text. No markdown, no bullet points, no headers. ` +
     `Be precise, practical, and friendly — the traveller is at the airport right now.`,
   );

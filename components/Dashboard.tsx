@@ -254,15 +254,19 @@ export default function Dashboard() {
     gate:        gateInput || undefined,
   });
 
-  // Fast Track eligibility derived directly from status access methods
+  // Fast Track eligibility: airline status OR credit card perk
   const hasFastTrack = useMemo(
-    () => !!status && status.accessMethods.some((m) => FAST_TRACK_TIERS.has(m)),
-    [status],
+    () =>
+      (!!status && status.accessMethods.some((m) => FAST_TRACK_TIERS.has(m))) ||
+      !!card?.fastTrack,
+    [status, card],
   );
-  const fastTrackReasons = useMemo(
-    () => (hasFastTrack && status ? [status.name] : []),
-    [hasFastTrack, status],
-  );
+  const fastTrackReasons = useMemo(() => {
+    const reasons: string[] = [];
+    if (status && status.accessMethods.some((m) => FAST_TRACK_TIERS.has(m))) reasons.push(status.name);
+    if (card?.fastTrack) reasons.push(card.name);
+    return reasons;
+  }, [status, card]);
 
   const chatContext = useMemo<ChatContext>(() => ({
     airport:     airport?.name ?? null,

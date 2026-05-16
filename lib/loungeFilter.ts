@@ -92,7 +92,9 @@ export function applyHardFilter(lounges: AILounge[], ctx: FilterContext): AILoun
         return ctx.cardNetworks.includes('dragon-pass');
 
       case 'amex-centurion':
-        return ctx.cardNetworks.includes('amex-platinum');
+        // Accept both spellings: 'amex-platinum' (from creditCards.loungeAccess)
+        // and 'amex-centurion' (the LoungeNetwork type name).
+        return ctx.cardNetworks.includes('amex-platinum') || ctx.cardNetworks.includes('amex-centurion');
 
       case 'airline-own': {
         // If the operating carrier is known, it must be in the lounge's allowedAirlines.
