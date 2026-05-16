@@ -1,23 +1,134 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { AILounge, AILoungeTier, LoungeNetwork, LoungeClass } from '@/lib/aiLounge';
-import { CARRIER_ALLIANCE } from '@/data/allianceRules';
+import { CARRIER_ALLIANCE, STATUS_ALLIANCE_TIER } from '@/data/allianceRules';
 import { applyHardFilter } from '@/lib/loungeFilter';
+import { LOUNGE_DATABASE, type StaticLounge } from '@/data/loungesData';
 
 interface LoungeQuery {
   airportIata: string;
   airportName: string;
   terminal?: string;
   airline?: string;
-  operatingCarrierCode?: string;    // IATA 2-letter code, e.g. "AY"
+  operatingCarrierCode?: string;
   cardName?: string;
   cardNetworks?: string[];
   statusName?: string;
-  statusAccessMethods?: string[];   // raw IDs for hard filtering server-side
-  allianceTier?: string;            // human-readable label for the AI prompt
+  statusAccessMethods?: string[];
+  allianceTier?: string;
   departureZone?: 'schengen' | 'non-schengen' | 'international';
   destination?: string;
   gate?: string;
 }
+
+// ─── Static lounge resolver ───────────────────────────────────────────────────
+
+/** Walk time string from gate prefix matching. Longest prefix wins. */
+function walkingInfo(gate: string | undefined, lounge: StaticLounge): string | undefined {
+  if (!gate || !lounge.gateProximity?.length) return undefined;
+  const g = gate.toUpperCase();
+  const sorted = [...lounge.gateProximity].sort((a, b) => b.prefix.length - a.prefix.length);
+  const match = sorted.find((p) => g.startsWith(p.prefix.toUpperCase()));
+  return match ? `~${match.minutes} min from Gate ${gate}` : undefined;
+}
+
+/** Human-readable access method label for a resolved network. */
+function accessMethodLabel(
+  network: LoungeNetwork,
+  statusAccessMethods: string[],
+  statusName?: string,
+): string {
+  switch (network) {
+    case 'oneworld': {
+      const entry = statusAccessMethods.map((m) => STATUS_ALLIANCE_TIER[m]).find(
+        (e) => e?.alliance === 'oneworld',
+      );
+      if (!entry) return 'oneworld status';
+      const tier = entry.tier.charAt(0).toUpperCase() + entry.tier.slice(1);
+      return `oneworld ${tier}`;
+    }
+    case 'star-alliance': return 'Star Alliance Gold';
+    case 'skyteam':       return 'SkyTeam Elite Plus';
+    case 'priority-pass': return 'Priority Pass';
+    case 'lounge-key':    return 'LoungeKey';
+    case 'dragon-pass':   return 'DragonPass';
+    case 'amex-centurion':return 'Amex Platinum';
+    case 'airline-own':   return statusName ?? 'Airline status';
+    case 'independent':   return 'Paid access';
+    default:              return 'Access granted';
+  }
+}
+
+/** Try each network on a lounge and return the first one the user qualifies for. */
+function resolveNetwork(
+  lounge: StaticLounge,
+  operatingCarrierCode: string | null,
+  statusAccessMethods: string[],
+  cardNetworks: string[],
+): LoungeNetwork | null {
+  for (const network of lounge.networks) {
+    const candidate: AILounge = {
+      id: lounge.id,
+      name: lounge.name,
+      location: lounge.location,
+      accessMethod: '',
+      hours: lounge.hours,
+      amenities: lounge.amenities,
+      tier: lounge.tier,
+      network,
+      loungeClass: lounge.loungeClass,
+    };
+    const passed = applyHardFilter([candidate], {
+      operatingCarrierCode,
+      statusAccessMethods,
+      cardNetworks,
+    });
+    if (passed.length > 0) return network;
+  }
+  return null;
+}
+
+function resolveStaticLounges(
+  statics: StaticLounge[],
+  q: LoungeQuery,
+): AILounge[] {
+  const zone = q.departureZone ?? 'international';
+  const carrierCode = q.operatingCarrierCode ?? null;
+  const statusMethods = q.statusAccessMethods ?? [];
+  const cardNetworks = q.cardNetworks ?? [];
+
+  const results: AILounge[] = [];
+
+  for (const lounge of statics) {
+    // Zone filter: 'all' and 'international' pass any zone
+    if (
+      lounge.area !== 'all' &&
+      lounge.area !== 'international' &&
+      lounge.area !== zone
+    ) continue;
+
+    const network = resolveNetwork(lounge, carrierCode, statusMethods, cardNetworks);
+    if (!network) continue;
+
+    results.push({
+      id:           lounge.id,
+      name:         lounge.name,
+      location:     lounge.location,
+      accessMethod: accessMethodLabel(network, statusMethods, q.statusName),
+      hours:        lounge.hours,
+      amenities:    lounge.amenities,
+      tier:         lounge.tier,
+      network,
+      loungeClass:  lounge.loungeClass,
+      walkingInfo:  walkingInfo(q.gate, lounge),
+    });
+  }
+
+  // Sort: ultra-premium first, then premium, then standard
+  const order: Record<AILoungeTier, number> = { 'ultra-premium': 0, premium: 1, standard: 2 };
+  return results.sort((a, b) => order[a.tier] - order[b.tier]);
+}
+
+// ─── Gemini fallback (for airports not in local DB) ───────────────────────────
 
 const GEMINI_URL =
   'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
@@ -54,14 +165,11 @@ function buildPrompt(q: LoungeQuery): string {
   if (q.cardName) {
     creds.push(`• Credit card: ${q.cardName}`);
     if (q.cardNetworks?.length) {
-      const networkLabels: Record<string, string> = {
-        'priority-pass': 'Priority Pass',
-        'lounge-key':    'LoungeKey',
-        'dragon-pass':   'DragonPass',
-        'amex-platinum': 'Amex Centurion/Platinum',
+      const labels: Record<string, string> = {
+        'priority-pass': 'Priority Pass', 'lounge-key': 'LoungeKey',
+        'dragon-pass': 'DragonPass', 'amex-platinum': 'Amex Centurion/Platinum',
       };
-      const nets = q.cardNetworks.map((n) => networkLabels[n] ?? n).join(', ');
-      creds.push(`  → Lounge networks: ${nets}`);
+      creds.push(`  → Networks: ${q.cardNetworks.map((n) => labels[n] ?? n).join(', ')}`);
     }
   }
   if (q.statusName) {
@@ -72,134 +180,81 @@ function buildPrompt(q: LoungeQuery): string {
   const carrierCode = q.operatingCarrierCode?.toUpperCase();
   const carrierAlliance = carrierCode ? (CARRIER_ALLIANCE[carrierCode] ?? null) : null;
   const carrierNote = carrierCode
-    ? `${q.airline ?? carrierCode} (IATA: ${carrierCode})${carrierAlliance ? ` — ${carrierAlliance} member` : ' — NOT an alliance member'}`
-    : 'not specified (assume user is flying an appropriate carrier for their status)';
+    ? `${q.airline ?? carrierCode} (${carrierCode})${carrierAlliance ? ` — ${carrierAlliance}` : ' — not an alliance member'}`
+    : 'not specified';
 
   const zoneNote =
-    q.departureZone === 'schengen'
-      ? 'Departing within Schengen Area — only include Schengen-side lounges.'
-      : q.departureZone === 'non-schengen'
-      ? 'Departing outside Schengen Area — only include Non-Schengen/International-side lounges.'
-      : 'Show all accessible airside lounges.';
+    q.departureZone === 'schengen'     ? 'Schengen-side lounges only.' :
+    q.departureZone === 'non-schengen' ? 'Non-Schengen/International-side lounges only.' :
+    'All accessible airside lounges.';
 
-  return `You are an expert airport lounge consultant with up-to-date knowledge of global airport lounges, access policies, and alliance rules (2024-2025).
+  return `You are an expert airport lounge consultant (knowledge: 2024-2025).
 
-USER SITUATION
-• Airport: ${q.airportName} (${q.airportIata})${q.terminal ? ` — ${q.terminal}` : ''}
-• Operating carrier: ${carrierNote}
-${q.destination ? `• Destination: ${q.destination}` : ''}
-${q.gate ? `• Departure gate: ${q.gate}` : ''}
-• Zone: ${zoneNote}
+AIRPORT: ${q.airportName} (${q.airportIata})${q.terminal ? ` — ${q.terminal}` : ''}
+CARRIER: ${carrierNote}
+${q.destination ? `DESTINATION: ${q.destination}` : ''}
+${q.gate ? `GATE: ${q.gate}` : ''}
+ZONE: ${zoneNote}
 
-USER CREDENTIALS
-${creds.length ? creds.join('\n') : '• None provided'}
+CREDENTIALS
+${creds.join('\n') || '• None'}
 
-ALLIANCE ACCESS RULES — apply STRICTLY:
+ALLIANCE RULES (strictly enforced by server after your response):
 ${carrierAlliance
-  ? `⚠ User flies ${carrierAlliance}. They may ONLY access ${carrierAlliance} alliance lounges via status. Do NOT list Star Alliance, SkyTeam, or other alliance lounges for status access.`
-  : '• Operating carrier unknown — include alliance lounges only when user holds clear qualifying status.'}
-• oneworld Emerald  → First Class + Business Class lounges of ANY oneworld carrier
-• oneworld Sapphire → Business Class lounges of ANY oneworld carrier ONLY (NOT First)
-• Star Alliance Gold → Business / Senator lounges of ANY Star Alliance carrier ONLY
-• SkyTeam Elite Plus → Business lounges of ANY SkyTeam carrier ONLY
-• Priority Pass / LoungeKey / DragonPass → independent partner lounges in that network
+  ? `⚠ Flying ${carrierAlliance} → only ${carrierAlliance} alliance lounges via status.`
+  : '• Carrier unknown — include alliance lounges where status clearly applies.'}
+• oneworld Emerald → First + Business lounges of any oneworld carrier
+• oneworld Sapphire → Business lounges only
+• Star Alliance Gold → Business/Senator lounges of any SA carrier
+• SkyTeam Elite Plus → Business lounges of any SkyTeam carrier
 
-REQUIRED JSON FIELDS — fill accurately:
-"network" (machine-readable access path for this user):
-  "oneworld"      → user accesses via oneworld Emerald or Sapphire status
-  "star-alliance" → user accesses via Star Alliance Gold status
-  "skyteam"       → user accesses via SkyTeam Elite Plus status
-  "priority-pass" → lounge accepts Priority Pass AND user has it
-  "lounge-key"    → lounge accepts LoungeKey AND user has it
-  "dragon-pass"   → lounge accepts DragonPass AND user has it
-  "amex-centurion"→ Amex Platinum / Centurion lounge
-  "airline-own"   → carrier's own lounge for their passengers / cabin class
-  "independent"   → pay lounge, hotel lounge, or other
+Set "network" to the specific credential granting access:
+oneworld | star-alliance | skyteam | priority-pass | lounge-key | dragon-pass | amex-centurion | airline-own | independent
 
-"loungeClass" (the lounge tier, used to validate Emerald vs Sapphire access):
-  "first"    → First Class / Flagship / Premium First lounge
-  "business" → Business Class / Gold / Senator lounge
-  "standard" → Standard / general access lounge
+Set "loungeClass": first | business | standard
+${q.gate ? `Include "walkingInfo": "~X min from Gate ${q.gate}" for each lounge.` : ''}
 
-TASK
-List ALL lounges at ${q.airportIata} this user can access right now.
-Be accurate and conservative — only list lounges where access is certain or very likely.
-${q.gate ? `Estimate walking time from Gate ${q.gate} for each lounge.` : ''}
-
-Return ONLY valid JSON (no markdown, no explanation):
+Return ONLY valid JSON:
 {
-  "lounges": [
-    {
-      "id": "kebab-slug-unique",
-      "name": "Official full lounge name",
-      "location": "Terminal, Level, Wing or area",
-      "accessMethod": "Human-readable: which credential grants this user entry",
-      "hours": "Daily HH:MM–HH:MM or 24h or check at lounge",
-      "amenities": ["up to 5 key amenities"],
-      "tier": "ultra-premium OR premium OR standard",
-      "network": "oneworld|star-alliance|skyteam|priority-pass|lounge-key|dragon-pass|amex-centurion|airline-own|independent",
-      "loungeClass": "first|business|standard",
-      "walkingInfo": "~X min from Gate Y (only if gate was provided, else omit)"
-    }
-  ],
-  "notes": "Any important caveats or conditions"
+  "lounges": [{
+    "id": "slug", "name": "Full name", "location": "Terminal/Level/Area",
+    "accessMethod": "Human-readable reason", "hours": "HH:MM–HH:MM or 24h",
+    "amenities": ["up to 5"], "tier": "ultra-premium|premium|standard",
+    "network": "...", "loungeClass": "first|business|standard"
+    ${q.gate ? ', "walkingInfo": "~X min from Gate Y"' : ''}
+  }],
+  "notes": "Any caveats"
 }`;
 }
 
-function buildVerifyPrompt(q: LoungeQuery, initialJson: string): string {
+function buildVerifyPrompt(q: LoungeQuery, prev: string): string {
   const carrierCode = q.operatingCarrierCode?.toUpperCase();
   const carrierAlliance = carrierCode ? (CARRIER_ALLIANCE[carrierCode] ?? null) : null;
+  return `Validate this lounge list for ${q.airportIata}:
+${prev}
 
-  return `You are a strict airport lounge access validator.
+Carrier: ${q.airline ?? 'unknown'}${carrierCode ? ` (${carrierCode})` : ''}${carrierAlliance ? ` — ${carrierAlliance}` : ''}
+Credentials: ${[q.cardName, q.statusName, q.allianceTier].filter(Boolean).join(' / ') || 'none'}
 
-Review this lounge list for a user at ${q.airportName} (${q.airportIata}):
-${initialJson}
+Check: lounge exists at this airport, network/loungeClass are correct, no wrong-alliance lounges.
+Fix errors, remove invalid entries, add missing qualifying lounges.
 
-Operating carrier: ${q.airline ?? 'unknown'}${carrierCode ? ` (IATA: ${carrierCode})` : ''}${carrierAlliance ? ` — ${carrierAlliance}` : ''}
-User credentials: ${[q.cardName, q.statusName, q.allianceTier].filter(Boolean).join(' / ') || 'none'}
-
-VERIFY each lounge entry:
-1. Does this lounge ACTUALLY exist and operate at ${q.airportIata}?
-2. Is "network" correct? Alliance lounges require flying the matching alliance carrier.
-3. Is "loungeClass" correct? (first/business/standard)
-4. Is the access method accurate for this user's specific credentials?
-5. Are any qualifying lounges missing?
-
-REMOVE entries where access is incorrect.
-FIX name, location, network, loungeClass, or accessMethod errors.
-ADD any clearly missing lounges.
-
-Return the corrected JSON in the EXACT same schema with no markdown:
-{
-  "lounges": [...],
-  "notes": "Verification complete. Changes: ..."
-}`;
+Return corrected JSON in same schema, no markdown.`;
 }
 
-function parseAIResponse(raw: string): { lounges?: AILounge[]; notes?: string } | null {
-  try {
-    return JSON.parse(raw) as { lounges?: AILounge[]; notes?: string };
-  } catch {
-    return null;
-  }
-}
-
-function normalizeLounges(raw: AILounge[]): AILounge[] {
+function normalizeAILounges(raw: AILounge[]): AILounge[] {
   return raw.map((l, i) => ({
     ...l,
     id:          l.id || `lounge-${i}`,
-    tier:        VALID_TIERS.has(l.tier as AILoungeTier)    ? l.tier        : 'standard' as AILoungeTier,
-    network:     VALID_NETWORKS.has(l.network as LoungeNetwork) ? l.network : 'independent' as LoungeNetwork,
-    loungeClass: VALID_CLASSES.has(l.loungeClass as LoungeClass) ? l.loungeClass : 'business' as LoungeClass,
+    tier:        VALID_TIERS.has(l.tier as AILoungeTier)         ? l.tier        : 'standard'     as AILoungeTier,
+    network:     VALID_NETWORKS.has(l.network as LoungeNetwork)  ? l.network     : 'independent'  as LoungeNetwork,
+    loungeClass: VALID_CLASSES.has(l.loungeClass as LoungeClass) ? l.loungeClass : 'business'     as LoungeClass,
   }));
 }
 
-export async function POST(req: NextRequest) {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json({ error: 'AI not configured on server' }, { status: 503 });
-  }
+// ─── Route handler ────────────────────────────────────────────────────────────
 
+export async function POST(req: NextRequest) {
   let body: LoungeQuery;
   try {
     body = await req.json() as LoungeQuery;
@@ -211,20 +266,40 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'airportIata is required' }, { status: 400 });
   }
 
-  try {
-    // Step 1 — AI generates initial lounge list
-    const step1Raw = await callGemini(buildPrompt(body), apiKey);
-    const step1 = parseAIResponse(step1Raw);
+  // ── Static path: airport is in our local database ─────────────────────────
+  const staticData = LOUNGE_DATABASE[body.airportIata.toUpperCase()];
+  if (staticData) {
+    const lounges = resolveStaticLounges(staticData, body);
+    return NextResponse.json({
+      lounges,
+      notes: lounges.length === 0
+        ? 'No lounges found for your credentials at this airport.'
+        : undefined,
+    });
+  }
 
-    // Step 2 — AI verification pass
-    const step2Raw = await callGemini(buildVerifyPrompt(body, step1Raw), apiKey);
-    const step2 = parseAIResponse(step2Raw);
-
-    const rawLounges = normalizeLounges(
-      step2?.lounges ?? step1?.lounges ?? [],
+  // ── Gemini fallback: airport not in local database ────────────────────────
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    return NextResponse.json(
+      { error: 'Airport not in local database and AI is not configured on server.', lounges: [] },
+      { status: 503 },
     );
+  }
 
-    // Step 3 — Hard alliance filter (deterministic, overrides AI)
+  try {
+    type AIResponse = { lounges?: AILounge[]; notes?: string };
+
+    const step1Raw = await callGemini(buildPrompt(body), apiKey);
+    let step1: AIResponse | null = null;
+    try { step1 = JSON.parse(step1Raw) as AIResponse; } catch { /* ignore */ }
+
+    const step2Raw = await callGemini(buildVerifyPrompt(body, step1Raw), apiKey);
+    let step2: AIResponse | null = null;
+    try { step2 = JSON.parse(step2Raw) as AIResponse; } catch { /* ignore */ }
+
+    const rawLounges = normalizeAILounges(step2?.lounges ?? step1?.lounges ?? []);
+
     const lounges = applyHardFilter(rawLounges, {
       operatingCarrierCode: body.operatingCarrierCode ?? null,
       statusAccessMethods:  body.statusAccessMethods  ?? [],
