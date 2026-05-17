@@ -104,6 +104,8 @@ export const STATUS_SORT: Record<AccessStatus, number> = {
   not_enough_info:        4,
   denied:                 5,
   closed:                 6,
+  not_offered_at_airport: 7,
+  not_applicable:         8,
 };
 
 // Enrich LoungeInput with display fields needed in the output.

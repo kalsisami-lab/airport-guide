@@ -147,8 +147,11 @@ export const airportServiceRules = sqliteTable('airport_service_rules', {
   id:                integer('id').primaryKey({ autoIncrement: true }),
   airportId:         integer('airport_id').notNull().references(() => airports.id),
   serviceType:       text('service_type', {
-    enum: ['fast_track', 'priority_boarding', 'baggage_drop', 'meet_and_greet'],
+    enum: ['fast_track_security', 'priority_checkin', 'priority_boarding', 'priority_baggage'],
   }).notNull(),
+  provider:          text('provider'),    // e.g. 'star_alliance_gold_track', 'paid', 'airline_own'
+  action:            text('action', { enum: ['allow', 'deny'] }).notNull().default('allow'),
+  notes:             text('notes'),       // human-readable caveat shown in UI tooltip
   minAllianceTier:   text('min_alliance_tier', {
     enum: ['oneworld_emerald', 'oneworld_sapphire', 'oneworld_ruby',
            'star_gold', 'star_silver', 'skyteam_elite_plus', 'skyteam_elite', 'none'],

@@ -8,6 +8,7 @@ import { eq, and, inArray } from 'drizzle-orm';
 import type { AllianceTier } from '../normalization/types';
 import type { Condition, LoungeInput } from '../engine/types';
 import type { AirportRepository, FastTrackRuleInput, PriorityBoardingRuleInput, LoungeInputWithMeta } from './types';
+import type { ServiceType } from '../airport-services/types';
 
 function toDate(s: string | null | undefined): string | null {
   return s ?? null;
@@ -93,7 +94,7 @@ export function createAirportRepository(): AirportRepository {
     },
 
     getFastTrackRules(iataCode: string): FastTrackRuleInput[] {
-      return getServiceRules(iataCode, 'fast_track');
+      return getServiceRules(iataCode, 'fast_track_security');
     },
 
     getPriorityBoardingRules(iataCode: string): PriorityBoardingRuleInput[] {
@@ -104,7 +105,7 @@ export function createAirportRepository(): AirportRepository {
 
 function getServiceRules(
   iataCode: string,
-  serviceType: 'fast_track' | 'priority_boarding',
+  serviceType: ServiceType,
 ): FastTrackRuleInput[] {
   const airport = db.select().from(airports)
     .where(eq(airports.iataCode, iataCode))

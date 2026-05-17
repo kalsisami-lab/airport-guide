@@ -40,6 +40,7 @@ export function buildPassengerContext(
     arrivalAirport:       flight.arrivalAirport,
     sameDayDeparture:     flight.sameDayDeparture ?? false,
     departureCountryCode: flight.departureCountryCode ?? '',
+    departureTime:        flight.departureTime,
   };
 }
 

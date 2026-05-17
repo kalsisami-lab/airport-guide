@@ -35,6 +35,7 @@ export interface PassengerContext {
   arrivalAirport: string;
   sameDayDeparture: boolean;
   departureCountryCode: string;
+  departureTime?: string;         // ISO 8601 — used for not_applicable checks
 }
 
 export interface StatusContext {

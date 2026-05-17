@@ -7,7 +7,10 @@ export type AccessStatus =
   | 'not_enough_info'
   | 'physically_unreachable'
   | 'paid_available'
-  | 'closed';
+  | 'closed'
+  // Airport-service-specific: service not offered here / not relevant to this trip
+  | 'not_offered_at_airport'
+  | 'not_applicable';
 
 export type ChannelType =
   | 'alliance_status'

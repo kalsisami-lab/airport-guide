@@ -8,6 +8,13 @@
       "when": 1778963089107,
       "tag": "0000_motionless_wrecker",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1778998382724,
+      "tag": "0001_spotty_misty_knight",
+      "breakpoints": true
     }
   ]
 }

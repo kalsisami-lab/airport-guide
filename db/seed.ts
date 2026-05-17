@@ -537,7 +537,7 @@ db.insert(airportServiceRules).values([
   // HEL fast track — Sapphire+ or SA Gold or ST Elite Plus; NOT credit cards
   {
     airportId:       apt.HEL.id,
-    serviceType:     'fast_track',
+    serviceType:     'fast_track_security',
     validFrom:       '2020-01-01',
     minAllianceTier: 'oneworld_sapphire',
     confidence:      0.99,
@@ -545,14 +545,14 @@ db.insert(airportServiceRules).values([
   },
   {
     airportId:       apt.HEL.id,
-    serviceType:     'fast_track',
+    serviceType:     'fast_track_security',
     validFrom:       '2020-01-01',
     minAllianceTier: 'star_gold',
     confidence:      0.95,
   },
   {
     airportId:       apt.HEL.id,
-    serviceType:     'fast_track',
+    serviceType:     'fast_track_security',
     validFrom:       '2020-01-01',
     minAllianceTier: 'skyteam_elite_plus',
     confidence:      0.90,
@@ -560,7 +560,7 @@ db.insert(airportServiceRules).values([
   // LHR fast track — BA Gold+ (Emerald), carrier-specific
   {
     airportId:         apt.LHR.id,
-    serviceType:       'fast_track',
+    serviceType:       'fast_track_security',
     validFrom:         '2020-01-01',
     minAllianceTier:   'oneworld_sapphire',
     carrierRestriction: ['BA', 'IB'],
@@ -569,7 +569,7 @@ db.insert(airportServiceRules).values([
   // FRA fast track — LH Senator+
   {
     airportId:       apt.FRA.id,
-    serviceType:     'fast_track',
+    serviceType:     'fast_track_security',
     validFrom:       '2020-01-01',
     minAllianceTier: 'star_gold',
     confidence:      0.95,
@@ -577,7 +577,7 @@ db.insert(airportServiceRules).values([
   // JFK fast track — oneworld Sapphire+ (AA, BA, IB, QR terminals)
   {
     airportId:       apt.JFK.id,
-    serviceType:     'fast_track',
+    serviceType:     'fast_track_security',
     validFrom:       '2020-01-01',
     minAllianceTier: 'oneworld_sapphire',
     confidence:      0.85,
@@ -586,7 +586,7 @@ db.insert(airportServiceRules).values([
   // DXB fast track — EK Skywards Gold/Platinum (tier=none, gate via status.fastTrack)
   {
     airportId:          apt.DXB.id,
-    serviceType:        'fast_track',
+    serviceType:        'fast_track_security',
     validFrom:          '2020-01-01',
     minAllianceTier:    'none',
     carrierRestriction: ['EK'],
