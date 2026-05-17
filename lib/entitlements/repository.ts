@@ -7,7 +7,7 @@ import {
 import { eq, and, inArray } from 'drizzle-orm';
 import type { AllianceTier } from '../normalization/types';
 import type { Condition, LoungeInput } from '../engine/types';
-import type { AirportRepository, FastTrackRuleInput, LoungeInputWithMeta } from './types';
+import type { AirportRepository, FastTrackRuleInput, PriorityBoardingRuleInput, LoungeInputWithMeta } from './types';
 
 function toDate(s: string | null | undefined): string | null {
   return s ?? null;
@@ -93,27 +93,38 @@ export function createAirportRepository(): AirportRepository {
     },
 
     getFastTrackRules(iataCode: string): FastTrackRuleInput[] {
-      const airport = db.select().from(airports)
-        .where(eq(airports.iataCode, iataCode))
-        .get();
-      if (!airport) return [];
+      return getServiceRules(iataCode, 'fast_track');
+    },
 
-      return db.select().from(airportServiceRules)
-        .where(and(
-          eq(airportServiceRules.airportId, airport.id),
-          eq(airportServiceRules.serviceType, 'fast_track'),
-        ))
-        .all()
-        .map((r) => ({
-          id:                 r.id,
-          priority:           r.priority,
-          validFrom:          r.validFrom,
-          validTo:            toDate(r.validTo),
-          confidence:         r.confidence,
-          minAllianceTier:    (r.minAllianceTier ?? null) as AllianceTier | null,
-          carrierRestriction: r.carrierRestriction ?? null,
-          conditions:         (r.conditions as Condition) ?? null,
-        }));
+    getPriorityBoardingRules(iataCode: string): PriorityBoardingRuleInput[] {
+      return getServiceRules(iataCode, 'priority_boarding');
     },
   };
+}
+
+function getServiceRules(
+  iataCode: string,
+  serviceType: 'fast_track' | 'priority_boarding',
+): FastTrackRuleInput[] {
+  const airport = db.select().from(airports)
+    .where(eq(airports.iataCode, iataCode))
+    .get();
+  if (!airport) return [];
+
+  return db.select().from(airportServiceRules)
+    .where(and(
+      eq(airportServiceRules.airportId, airport.id),
+      eq(airportServiceRules.serviceType, serviceType),
+    ))
+    .all()
+    .map((r) => ({
+      id:                 r.id,
+      priority:           r.priority,
+      validFrom:          r.validFrom,
+      validTo:            r.validTo ?? null,
+      confidence:         r.confidence,
+      minAllianceTier:    (r.minAllianceTier ?? null) as AllianceTier | null,
+      carrierRestriction: r.carrierRestriction ?? null,
+      conditions:         (r.conditions as Condition) ?? null,
+    }));
 }

@@ -95,8 +95,9 @@ function makeAirportRepo(
   fastTrackMap: Record<string, FastTrackRuleInput[]> = {},
 ): AirportRepository {
   return {
-    getLoungesAtAirport: (iata) => loungesMap[iata] ?? [],
-    getFastTrackRules:   (iata) => fastTrackMap[iata] ?? [],
+    getLoungesAtAirport:      (iata) => loungesMap[iata] ?? [],
+    getFastTrackRules:        (iata) => fastTrackMap[iata] ?? [],
+    getPriorityBoardingRules: (_iata) => [],
   };
 }
 

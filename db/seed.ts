@@ -574,6 +574,59 @@ db.insert(airportServiceRules).values([
     minAllianceTier: 'star_gold',
     confidence:      0.95,
   },
+  // JFK fast track — oneworld Sapphire+ (AA, BA, IB, QR terminals)
+  {
+    airportId:       apt.JFK.id,
+    serviceType:     'fast_track',
+    validFrom:       '2020-01-01',
+    minAllianceTier: 'oneworld_sapphire',
+    confidence:      0.85,
+    sourceUrl:       'https://www.aa.com/i18n/travel-info/airport/priority-check-in.jsp',
+  },
+  // DXB fast track — EK Skywards Gold/Platinum (tier=none, gate via status.fastTrack)
+  {
+    airportId:          apt.DXB.id,
+    serviceType:        'fast_track',
+    validFrom:          '2020-01-01',
+    minAllianceTier:    'none',
+    carrierRestriction: ['EK'],
+    confidence:         0.90,
+    sourceUrl:          'https://www.emirates.com/english/experience/our-promise/fast-track/',
+  },
+
+  // ─── Priority boarding ───────────────────────────────────────────────────────
+  // HEL priority boarding — AY Platinum (emerald) or Star Gold
+  {
+    airportId:       apt.HEL.id,
+    serviceType:     'priority_boarding',
+    validFrom:       '2020-01-01',
+    minAllianceTier: 'oneworld_emerald',
+    confidence:      0.95,
+  },
+  {
+    airportId:       apt.HEL.id,
+    serviceType:     'priority_boarding',
+    validFrom:       '2020-01-01',
+    minAllianceTier: 'star_gold',
+    confidence:      0.90,
+  },
+  // FRA priority boarding — LH HON Circle / Star Gold
+  {
+    airportId:       apt.FRA.id,
+    serviceType:     'priority_boarding',
+    validFrom:       '2020-01-01',
+    minAllianceTier: 'star_gold',
+    confidence:      0.95,
+  },
+  // LHR priority boarding — BA Gold (emerald), BA/IB flights only
+  {
+    airportId:          apt.LHR.id,
+    serviceType:        'priority_boarding',
+    validFrom:          '2020-01-01',
+    minAllianceTier:    'oneworld_emerald',
+    carrierRestriction: ['BA', 'IB'],
+    confidence:         0.90,
+  },
 ]).run();
 
 console.log('✓ airport_service_rules');

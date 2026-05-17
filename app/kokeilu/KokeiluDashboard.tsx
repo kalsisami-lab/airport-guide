@@ -64,6 +64,11 @@ interface EntitlementResult {
     confidence: number;
     reason: string;
   };
+  priorityBoarding: {
+    available: boolean;
+    confidence: number;
+    reason: string;
+  };
   evaluatedAt: string;
 }
 
@@ -337,7 +342,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 // ─── Results ──────────────────────────────────────────────────────────────────
 
 function Results({ result }: { result: EntitlementResult }) {
-  const { passenger, status, lounges, fastTrack } = result;
+  const { passenger, status, lounges, fastTrack, priorityBoarding } = result;
 
   const allowedCount  = lounges.filter((l) => l.access.status === 'allowed').length;
   const likelyCount   = lounges.filter((l) => l.access.status === 'likely_allowed').length;
@@ -375,18 +380,10 @@ function Results({ result }: { result: EntitlementResult }) {
           <span className="text-xs text-slate-500">No status card</span>
         )}
 
-        {/* Fast track */}
-        <div className="flex items-center gap-2">
-          <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${
-            fastTrack.available
-              ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
-              : 'bg-slate-700/30 text-slate-500 border-slate-700'
-          }`}>
-            {fastTrack.available ? '⚡ Fast Track available' : 'No fast track'}
-          </span>
-          {fastTrack.reason && (
-            <span className="text-xs text-slate-500">{fastTrack.reason}</span>
-          )}
+        {/* Fast track + priority boarding */}
+        <div className="flex flex-wrap gap-2">
+          <ServiceBadge available={fastTrack.available} label="Fast Track" icon="⚡" reason={fastTrack.reason} />
+          <ServiceBadge available={priorityBoarding.available} label="Priority Boarding" icon="🛫" reason={priorityBoarding.reason} />
         </div>
       </div>
 
@@ -470,5 +467,24 @@ function Pill({ children }: { children: React.ReactNode }) {
     <span className="text-xs px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-400">
       {children}
     </span>
+  );
+}
+
+// ─── ServiceBadge ─────────────────────────────────────────────────────────────
+
+function ServiceBadge({
+  available, label, icon, reason,
+}: { available: boolean; label: string; icon: string; reason: string }) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${
+        available
+          ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+          : 'bg-slate-700/30 text-slate-500 border-slate-700'
+      }`}>
+        {icon} {available ? label : `No ${label.toLowerCase()}`}
+      </span>
+      {reason && <span className="text-xs text-slate-600 hidden sm:inline">{reason}</span>}
+    </div>
   );
 }

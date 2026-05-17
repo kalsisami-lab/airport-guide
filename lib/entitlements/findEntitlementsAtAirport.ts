@@ -1,6 +1,7 @@
 import { buildPassengerContext, buildStatusContext } from '../normalization/normalize';
 import { evaluateLoungeAccess } from '../engine/evaluateLoungeAccess';
 import { evaluateFastTrack } from './fastTrack';
+import { evaluatePriorityBoarding } from './priorityBoarding';
 import type {
   AirportEntitlements,
   FlightRequest,
@@ -57,15 +58,19 @@ export function findEntitlementsAtAirport(
       return b.access.confidence - a.access.confidence;
     });
 
-  // ── Fast track (separate engine, same pass) ─────────────────────────────────
+  // ── Fast track + priority boarding (separate engines, same pass) ─────────────
   const ftRules  = repos.airport.getFastTrackRules(flight.departureAirport);
   const fastTrack = evaluateFastTrack(passenger, status, ftRules, now);
+
+  const pbRules = repos.airport.getPriorityBoardingRules(flight.departureAirport);
+  const priorityBoarding = evaluatePriorityBoarding(passenger, status, pbRules, now);
 
   return {
     passenger,
     status,
     lounges,
     fastTrack,
+    priorityBoarding,
     evaluatedAt: now.toISOString(),
   };
 }

@@ -44,11 +44,24 @@ export interface FastTrackResult {
   source: string;
 }
 
+// ─── Priority boarding ────────────────────────────────────────────────────────
+
+// Reuses the same rule shape as fast track — both are airport-level services.
+export type PriorityBoardingRuleInput = FastTrackRuleInput;
+
+export interface PriorityBoardingResult {
+  available: boolean;
+  confidence: number;
+  reason: string;
+  source: string;
+}
+
 // ─── Repository interface ─────────────────────────────────────────────────────
 
 export interface AirportRepository {
   getLoungesAtAirport(iataCode: string): LoungeInput[];
   getFastTrackRules(iataCode: string): FastTrackRuleInput[];
+  getPriorityBoardingRules(iataCode: string): PriorityBoardingRuleInput[];
 }
 
 export interface Repos {
@@ -74,11 +87,12 @@ export interface LoungeEntitlement {
 }
 
 export interface AirportEntitlements {
-  passenger:   PassengerContext;
-  status:      StatusContext | null;
-  lounges:     LoungeEntitlement[];
-  fastTrack:   FastTrackResult;
-  evaluatedAt: string;            // ISO timestamp
+  passenger:        PassengerContext;
+  status:           StatusContext | null;
+  lounges:          LoungeEntitlement[];
+  fastTrack:        FastTrackResult;
+  priorityBoarding: PriorityBoardingResult;
+  evaluatedAt:      string;       // ISO timestamp
 }
 
 // Sort weight — lower = shown first.
