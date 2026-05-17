@@ -174,6 +174,20 @@ describe('buildStatusContext', () => {
     assert.equal(result, null);
   });
 
+  test('AY Platinum (emerald) + LH Senator (star_gold) + SAS-lento → star_gold, ei emerald', () => {
+    // Kriittinen tapaus: korkein absoluuttinen tier (emerald) on väärä valinta
+    // kun lennon allianssi on star_alliance. Oikea on star_gold.
+    const cards: UserStatusCard[] = [
+      { programCode: 'ay-plus',       tierName: 'Platinum' },  // oneworld_emerald
+      { programCode: 'lh-miles-more', tierName: 'Senator'  },  // star_gold
+    ];
+    // SK = SAS = star_alliance
+    const result = buildStatusContext(cards, 'star_alliance', tierRepo);
+    assert.ok(result !== null);
+    assert.equal(result.allianceTier, 'star_gold',        'Pitää valita star_gold, ei oneworld_emerald');
+    assert.equal(result.programCode,  'lh-miles-more',    'LH Senator on lennon allianssin kortti');
+  });
+
   test('flightAlliance null (itsenäinen lentoyhtiö) → palautetaan paras käytettävissä oleva kortti', () => {
     const cards: UserStatusCard[] = [{ programCode: 'ay-plus', tierName: 'Platinum' }];
     const result = buildStatusContext(cards, null, tierRepo);
