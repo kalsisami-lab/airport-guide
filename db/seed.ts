@@ -540,7 +540,6 @@ db.insert(airportServiceRules).values([
     minAllianceTier: 'oneworld_sapphire',
     confidence:      0.99,
     sourceUrl:       'https://www.finavia.fi/en/airports/helsinki-airport/services/fast-track',
-    conditions:      { note: 'Credit cards do not grant fast track at HEL' },
   },
   {
     airportId:       apt.HEL.id,
@@ -561,7 +560,6 @@ db.insert(airportServiceRules).values([
     minAllianceTier:   'oneworld_sapphire',
     carrierRestriction: ['BA', 'IB'],
     confidence:        0.95,
-    conditions:        { note: 'Fast track at LHR available at T3 and T5 for BA/IB passengers' },
   },
   // FRA fast track — LH Senator+
   {
