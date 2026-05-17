@@ -423,6 +423,7 @@ function addRule(
 ) {
   db.insert(loungeAccessRules).values({
     channelId,
+    validFrom:          '2020-01-01',
     minAllianceTier:    opts.minAllianceTier,
     carrierRestriction: opts.carrierRestriction ?? null,
     confidence:         opts.confidence ?? 0.95,
@@ -537,6 +538,7 @@ db.insert(airportServiceRules).values([
   {
     airportId:       apt.HEL.id,
     serviceType:     'fast_track',
+    validFrom:       '2020-01-01',
     minAllianceTier: 'oneworld_sapphire',
     confidence:      0.99,
     sourceUrl:       'https://www.finavia.fi/en/airports/helsinki-airport/services/fast-track',
@@ -544,12 +546,14 @@ db.insert(airportServiceRules).values([
   {
     airportId:       apt.HEL.id,
     serviceType:     'fast_track',
+    validFrom:       '2020-01-01',
     minAllianceTier: 'star_gold',
     confidence:      0.95,
   },
   {
     airportId:       apt.HEL.id,
     serviceType:     'fast_track',
+    validFrom:       '2020-01-01',
     minAllianceTier: 'skyteam_elite_plus',
     confidence:      0.90,
   },
@@ -557,6 +561,7 @@ db.insert(airportServiceRules).values([
   {
     airportId:         apt.LHR.id,
     serviceType:       'fast_track',
+    validFrom:         '2020-01-01',
     minAllianceTier:   'oneworld_sapphire',
     carrierRestriction: ['BA', 'IB'],
     confidence:        0.95,
@@ -565,6 +570,7 @@ db.insert(airportServiceRules).values([
   {
     airportId:       apt.FRA.id,
     serviceType:     'fast_track',
+    validFrom:       '2020-01-01',
     minAllianceTier: 'star_gold',
     confidence:      0.95,
   },
