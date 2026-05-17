@@ -224,7 +224,7 @@ const loungeRows = db
       loungeClass:         'first',
       area:                'non_schengen',
       openingHours:        'Daily 05:00–22:00',
-      amenities:           JSON.stringify(['À la carte dining', 'Premium bar', 'Spa & sauna', 'Shower suites', 'High-speed WiFi']),
+      amenities:           ['À la carte dining', 'Premium bar', 'Spa & sauna', 'Shower suites', 'High-speed WiFi'],
     },
     {
       airportId:           apt.HEL.id,
@@ -235,7 +235,7 @@ const loungeRows = db
       loungeClass:         'business',
       area:                'non_schengen',
       openingHours:        'Daily 05:00–22:00',
-      amenities:           JSON.stringify(['Hot & cold buffet', 'Bar', 'Shower suites', 'WiFi', 'Work desks']),
+      amenities:           ['Hot & cold buffet', 'Bar', 'Shower suites', 'WiFi', 'Work desks'],
     },
     {
       airportId:           apt.HEL.id,
@@ -246,7 +246,7 @@ const loungeRows = db
       loungeClass:         'business',
       area:                'schengen',
       openingHours:        'Daily 05:00–22:00',
-      amenities:           JSON.stringify(['Hot & cold buffet', 'Bar', 'Shower rooms', 'WiFi']),
+      amenities:           ['Hot & cold buffet', 'Bar', 'Shower rooms', 'WiFi'],
     },
     {
       airportId:           apt.HEL.id,
@@ -257,7 +257,7 @@ const loungeRows = db
       loungeClass:         'standard',
       area:                'schengen',
       openingHours:        'Daily 05:00–21:00',
-      amenities:           JSON.stringify(['Buffet', 'Bar', 'WiFi', 'TV lounge']),
+      amenities:           ['Buffet', 'Bar', 'WiFi', 'TV lounge'],
     },
     // ── FRA ──────────────────────────────────────────────────────────────────
     {
@@ -269,7 +269,7 @@ const loungeRows = db
       loungeClass:         'business',
       area:                'non_schengen',
       openingHours:        'Daily 09:00–15:00',
-      amenities:           JSON.stringify(['Japanese cuisine', 'Bar', 'Shower rooms', 'WiFi']),
+      amenities:           ['Japanese cuisine', 'Bar', 'Shower rooms', 'WiFi'],
     },
     {
       airportId:           apt.FRA.id,
@@ -280,7 +280,7 @@ const loungeRows = db
       loungeClass:         'business',
       area:                'non_schengen',
       openingHours:        'Daily 08:00–16:00',
-      amenities:           JSON.stringify(['À la carte dining', 'Premium bar', 'Shower rooms', 'WiFi']),
+      amenities:           ['À la carte dining', 'Premium bar', 'Shower rooms', 'WiFi'],
     },
     {
       airportId:           apt.FRA.id,
@@ -291,7 +291,7 @@ const loungeRows = db
       loungeClass:         'business',
       area:                'non_schengen',
       openingHours:        'Daily 05:30–22:30',
-      amenities:           JSON.stringify(['Hot food station', 'Premium bar', 'Shower suites', 'WiFi', 'Business centre']),
+      amenities:           ['Hot food station', 'Premium bar', 'Shower suites', 'WiFi', 'Business centre'],
     },
     {
       airportId:           apt.FRA.id,
@@ -302,7 +302,7 @@ const loungeRows = db
       loungeClass:         'business',
       area:                'schengen',
       openingHours:        'Daily 05:30–22:30',
-      amenities:           JSON.stringify(['Hot & cold buffet', 'Bar', 'Shower rooms', 'WiFi']),
+      amenities:           ['Hot & cold buffet', 'Bar', 'Shower rooms', 'WiFi'],
     },
     {
       airportId:           apt.FRA.id,
@@ -313,7 +313,7 @@ const loungeRows = db
       loungeClass:         'first',
       area:                'non_schengen',
       openingHours:        'Daily 05:30–22:30',
-      amenities:           JSON.stringify(['Gourmet à la carte', 'Cigar lounge', 'Spa', 'Private suites', 'Personal butler']),
+      amenities:           ['Gourmet à la carte', 'Cigar lounge', 'Spa', 'Private suites', 'Personal butler'],
     },
     // ── LHR ──────────────────────────────────────────────────────────────────
     {
@@ -325,7 +325,7 @@ const loungeRows = db
       loungeClass:         'first',
       area:                'international',
       openingHours:        'Daily 05:00–22:00',
-      amenities:           JSON.stringify(['Fine dining', 'Champagne bar', 'Daybeds', 'Spa treatments', 'Personal host']),
+      amenities:           ['Fine dining', 'Champagne bar', 'Daybeds', 'Spa treatments', 'Personal host'],
     },
     {
       airportId:           apt.LHR.id,
@@ -336,7 +336,7 @@ const loungeRows = db
       loungeClass:         'business',
       area:                'international',
       openingHours:        'Daily 05:00–22:00',
-      amenities:           JSON.stringify(['Hot buffet', 'Bar', 'Shower rooms', 'WiFi', 'Work desks']),
+      amenities:           ['Hot buffet', 'Bar', 'Shower rooms', 'WiFi', 'Work desks'],
     },
     // ── JFK ──────────────────────────────────────────────────────────────────
     {
@@ -348,7 +348,7 @@ const loungeRows = db
       loungeClass:         'first',
       area:                'international',
       openingHours:        'Daily 05:30–23:00',
-      amenities:           JSON.stringify(['À la carte dining', 'Premium bar', 'Shower suites', 'Spa', 'WiFi']),
+      amenities:           ['À la carte dining', 'Premium bar', 'Shower suites', 'Spa', 'WiFi'],
     },
     {
       airportId:           apt.JFK.id,
@@ -359,7 +359,7 @@ const loungeRows = db
       loungeClass:         'business',
       area:                'international',
       openingHours:        'Daily 05:30–23:00',
-      amenities:           JSON.stringify(['Hot buffet', 'Bar', 'Shower rooms', 'WiFi', 'Work desks']),
+      amenities:           ['Hot buffet', 'Bar', 'Shower rooms', 'WiFi', 'Work desks'],
     },
     // ── DXB ──────────────────────────────────────────────────────────────────
     {
@@ -371,7 +371,7 @@ const loungeRows = db
       loungeClass:         'first',
       area:                'international',
       openingHours:        '24 hours',
-      amenities:           JSON.stringify(['À la carte dining', 'Bar', 'Spa', 'Jacuzzi', 'Sleep pods', 'WiFi']),
+      amenities:           ['À la carte dining', 'Bar', 'Spa', 'Jacuzzi', 'Sleep pods', 'WiFi'],
     },
     {
       airportId:           apt.DXB.id,
@@ -382,7 +382,7 @@ const loungeRows = db
       loungeClass:         'business',
       area:                'international',
       openingHours:        '24 hours',
-      amenities:           JSON.stringify(['Hot buffet', 'Bar', 'Shower rooms', 'WiFi']),
+      amenities:           ['Hot buffet', 'Bar', 'Shower rooms', 'WiFi'],
     },
   ])
   .returning()
@@ -424,7 +424,7 @@ function addRule(
   db.insert(loungeAccessRules).values({
     channelId,
     minAllianceTier:    opts.minAllianceTier,
-    carrierRestriction: opts.carrierRestriction ? JSON.stringify(opts.carrierRestriction) : null,
+    carrierRestriction: opts.carrierRestriction ?? null,
     confidence:         opts.confidence ?? 0.95,
     sourceUrl:          opts.sourceUrl ?? null,
   }).run();
@@ -540,7 +540,7 @@ db.insert(airportServiceRules).values([
     minAllianceTier: 'oneworld_sapphire',
     confidence:      0.99,
     sourceUrl:       'https://www.finavia.fi/en/airports/helsinki-airport/services/fast-track',
-    conditions:      JSON.stringify({ note: 'Credit cards do not grant fast track at HEL' }),
+    conditions:      { note: 'Credit cards do not grant fast track at HEL' },
   },
   {
     airportId:       apt.HEL.id,
@@ -559,9 +559,9 @@ db.insert(airportServiceRules).values([
     airportId:         apt.LHR.id,
     serviceType:       'fast_track',
     minAllianceTier:   'oneworld_sapphire',
-    carrierRestriction: JSON.stringify(['BA', 'IB']),
+    carrierRestriction: ['BA', 'IB'],
     confidence:        0.95,
-    conditions:        JSON.stringify({ note: 'Fast track at LHR available at T3 and T5 for BA/IB passengers' }),
+    conditions:        { note: 'Fast track at LHR available at T3 and T5 for BA/IB passengers' },
   },
   // FRA fast track — LH Senator+
   {

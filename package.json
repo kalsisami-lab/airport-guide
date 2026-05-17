@@ -9,7 +9,8 @@
     "lint": "eslint",
     "db:migrate": "drizzle-kit migrate",
     "db:seed": "tsx db/seed.ts",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "test": "node --require tsx/cjs --test 'lib/normalization/__tests__/*.test.ts'"
   },
   "dependencies": {
     "better-sqlite3": "^12.10.0",
