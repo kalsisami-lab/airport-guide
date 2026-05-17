@@ -3,13 +3,13 @@ import assert from 'node:assert/strict';
 import { findEntitlementsAtAirport } from '../findEntitlementsAtAirport';
 import type {
   AirportRepository,
-  FastTrackRuleInput,
+  AirportServiceRuleInput,
   FlightRequest,
   Repos,
   UserInput,
 } from '../types';
+import type { ServiceType } from '../../airport-services/types';
 import type { AirlineRepository, AllianceCode, TierRepository } from '../../normalization/types';
-import type { LoungeInput } from '../../engine/types';
 import type { LoungeInputWithMeta } from '../types';
 
 // ─── Mock repositories ────────────────────────────────────────────────────────
@@ -90,14 +90,31 @@ function makeLounge(
   };
 }
 
+function makeServiceRule(overrides: Partial<AirportServiceRuleInput> = {}): AirportServiceRuleInput {
+  return {
+    id:                 1,
+    priority:           100,
+    validFrom:          '2020-01-01',
+    validTo:            null,
+    confidence:         0.95,
+    action:             'allow',
+    minAllianceTier:    null,
+    carrierRestriction: null,
+    conditions:         null,
+    provider:           null,
+    notes:              null,
+    ...overrides,
+  };
+}
+
 function makeAirportRepo(
   loungesMap: Record<string, LoungeInputWithMeta[]>,
-  fastTrackMap: Record<string, FastTrackRuleInput[]> = {},
+  serviceRulesMap: Partial<Record<string, Partial<Record<ServiceType, AirportServiceRuleInput[]>>>> = {},
 ): AirportRepository {
   return {
-    getLoungesAtAirport:      (iata) => loungesMap[iata] ?? [],
-    getFastTrackRules:        (iata) => fastTrackMap[iata] ?? [],
-    getPriorityBoardingRules: (_iata) => [],
+    getLoungesAtAirport: (iata) => loungesMap[iata] ?? [],
+    getAirportServiceRules: (iata, serviceType) =>
+      serviceRulesMap[iata]?.[serviceType] ?? [],
   };
 }
 
@@ -271,20 +288,12 @@ describe('findEntitlementsAtAirport', () => {
       departureAirport: 'FRA',
       arrivalAirport:   'ZRH',
     };
-    const ftRule: FastTrackRuleInput = {
-      id:                 1,
-      priority:           100,
-      validFrom:          '2020-01-01',
-      validTo:            null,
-      confidence:         0.95,
-      minAllianceTier:    'star_gold',
-      carrierRestriction: null,
-      conditions:         null,
-    };
     const repos: Repos = {
       airlines: airlineRepo,
       tiers:    tierRepo,
-      airport:  makeAirportRepo({ FRA: [] }, { FRA: [ftRule] }),
+      airport:  makeAirportRepo({ FRA: [] }, {
+        FRA: { fast_track_security: [makeServiceRule({ minAllianceTier: 'star_gold' })] },
+      }),
     };
 
     const result = findEntitlementsAtAirport(user, flight, repos, { now: NOW });
@@ -301,15 +310,12 @@ describe('findEntitlementsAtAirport', () => {
       departureAirport: 'HEL',
       arrivalAirport:   'LHR',
     };
-    const ftRule: FastTrackRuleInput = {
-      id: 1, priority: 100, validFrom: '2020-01-01', validTo: null,
-      confidence: 0.95, minAllianceTier: 'oneworld_sapphire',
-      carrierRestriction: null, conditions: null,
-    };
     const repos: Repos = {
       airlines: airlineRepo,
       tiers:    tierRepo,
-      airport:  makeAirportRepo({ HEL: [] }, { HEL: [ftRule] }),
+      airport:  makeAirportRepo({ HEL: [] }, {
+        HEL: { fast_track_security: [makeServiceRule({ minAllianceTier: 'oneworld_sapphire' })] },
+      }),
     };
 
     const result = findEntitlementsAtAirport(user, flight, repos, { now: NOW });

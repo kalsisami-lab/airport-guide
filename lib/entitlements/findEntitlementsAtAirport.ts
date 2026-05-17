@@ -1,18 +1,30 @@
 import { buildPassengerContext, buildStatusContext } from '../normalization/normalize';
 import { evaluateLoungeAccess } from '../engine/evaluateLoungeAccess';
-import { evaluateFastTrack } from './fastTrack';
-import { evaluatePriorityBoarding } from './priorityBoarding';
+import { findAirportServices } from '../airport-services/findAirportServices';
+import { ALL_SERVICE_TYPES } from '../airport-services/types';
 import type {
   AirportEntitlements,
+  FastTrackResult,
   FlightRequest,
   LoungeEntitlement,
   LoungeInputWithMeta,
+  PriorityBoardingResult,
   Repos,
-  STATUS_SORT,
   UserInput,
 } from './types';
 import { STATUS_SORT as SORT_MAP } from './types';
-import type { EvalOptions } from '../engine/types';
+import type { AccessResult, EvalOptions } from '../engine/types';
+import type { ServiceType } from '../airport-services/types';
+
+// Converts an AccessResult to the legacy boolean-result shape still used by the UI.
+function toAvailableResult(r: AccessResult): FastTrackResult {
+  return {
+    available:  r.status === 'allowed' || r.status === 'likely_allowed',
+    confidence: r.confidence,
+    reason:     r.reason,
+    source:     r.source,
+  };
+}
 
 export function findEntitlementsAtAirport(
   user: UserInput,
@@ -22,14 +34,13 @@ export function findEntitlementsAtAirport(
 ): AirportEntitlements {
   const now = opts?.now ?? new Date();
 
-  // ── Phase 2: build contexts ─────────────────────────────────────────────────
+  // ── Build contexts ─────────────────────────────────────────────────────────
   const passenger = buildPassengerContext(flight, repos.airlines);
   const status    = buildStatusContext(user.statusCards, passenger.operatingAlliance, repos.tiers);
 
-  // ── Fetch lounges from airport repository ───────────────────────────────────
+  // ── Evaluate lounges ───────────────────────────────────────────────────────
   const loungeInputs = repos.airport.getLoungesAtAirport(flight.departureAirport) as LoungeInputWithMeta[];
 
-  // ── Phase 3: evaluate each lounge ───────────────────────────────────────────
   const evalOpts: EvalOptions = {
     now,
     passengerTerminalId: flight.departureTerminalId,
@@ -51,26 +62,32 @@ export function findEntitlementsAtAirport(
       access: evaluateLoungeAccess(passenger, status, lounge, evalOpts),
     }))
     .sort((a, b) => {
-      // Primary: status priority
       const d = SORT_MAP[a.access.status] - SORT_MAP[b.access.status];
       if (d !== 0) return d;
-      // Secondary: confidence DESC (more certain results first)
       return b.access.confidence - a.access.confidence;
     });
 
-  // ── Fast track + priority boarding (separate engines, same pass) ─────────────
-  const ftRules  = repos.airport.getFastTrackRules(flight.departureAirport);
-  const fastTrack = evaluateFastTrack(passenger, status, ftRules, now);
+  // ── Evaluate airport services (new engine) ─────────────────────────────────
+  const rulesMap = Object.fromEntries(
+    ALL_SERVICE_TYPES.map((svc) => [
+      svc,
+      repos.airport.getAirportServiceRules(flight.departureAirport, svc),
+    ]),
+  ) as Record<ServiceType, ReturnType<typeof repos.airport.getAirportServiceRules>>;
 
-  const pbRules = repos.airport.getPriorityBoardingRules(flight.departureAirport);
-  const priorityBoarding = evaluatePriorityBoarding(passenger, status, pbRules, now);
+  const airportServices = findAirportServices(passenger, status, flight.departureAirport, rulesMap, now);
+
+  // ── Backward-compatible derived fields for the existing UI ─────────────────
+  const fastTrack:        FastTrackResult        = toAvailableResult(airportServices.services.fast_track_security);
+  const priorityBoarding: PriorityBoardingResult = toAvailableResult(airportServices.services.priority_boarding);
 
   return {
     passenger,
     status,
     lounges,
+    services:         airportServices.services,
     fastTrack,
     priorityBoarding,
-    evaluatedAt: now.toISOString(),
+    evaluatedAt:      now.toISOString(),
   };
 }

@@ -1,6 +1,7 @@
 import type { AllianceTier } from '../normalization/types';
 import type { AccessResult, AccessStatus, ChannelType, Condition, LoungeInput } from '../engine/types';
 import type { PassengerContext, StatusContext, AirlineRepository, TierRepository, UserStatusCard } from '../normalization/types';
+import type { AirportServiceRuleInput, ServiceType } from '../airport-services/types';
 
 export type { PassengerContext, StatusContext };
 
@@ -56,12 +57,14 @@ export interface PriorityBoardingResult {
   source: string;
 }
 
+// Re-export for external consumers (e.g. test helpers).
+export type { AirportServiceRuleInput, ServiceType };
+
 // ─── Repository interface ─────────────────────────────────────────────────────
 
 export interface AirportRepository {
   getLoungesAtAirport(iataCode: string): LoungeInput[];
-  getFastTrackRules(iataCode: string): FastTrackRuleInput[];
-  getPriorityBoardingRules(iataCode: string): PriorityBoardingRuleInput[];
+  getAirportServiceRules(iataCode: string, serviceType: ServiceType): AirportServiceRuleInput[];
 }
 
 export interface Repos {
@@ -90,6 +93,8 @@ export interface AirportEntitlements {
   passenger:        PassengerContext;
   status:           StatusContext | null;
   lounges:          LoungeEntitlement[];
+  services:         Record<ServiceType, AccessResult>;
+  // Backward-compatible fields derived from services — will be removed when UI is updated.
   fastTrack:        FastTrackResult;
   priorityBoarding: PriorityBoardingResult;
   evaluatedAt:      string;       // ISO timestamp

@@ -7,8 +7,8 @@ import {
 import { eq, and, inArray } from 'drizzle-orm';
 import type { AllianceTier } from '../normalization/types';
 import type { Condition, LoungeInput } from '../engine/types';
-import type { AirportRepository, FastTrackRuleInput, PriorityBoardingRuleInput, LoungeInputWithMeta } from './types';
-import type { ServiceType } from '../airport-services/types';
+import type { AirportRepository, LoungeInputWithMeta } from './types';
+import type { AirportServiceRuleInput, ServiceType } from '../airport-services/types';
 
 function toDate(s: string | null | undefined): string | null {
   return s ?? null;
@@ -93,39 +93,31 @@ export function createAirportRepository(): AirportRepository {
       }));
     },
 
-    getFastTrackRules(iataCode: string): FastTrackRuleInput[] {
-      return getServiceRules(iataCode, 'fast_track_security');
-    },
+    getAirportServiceRules(iataCode: string, serviceType: ServiceType): AirportServiceRuleInput[] {
+      const airport = db.select().from(airports)
+        .where(eq(airports.iataCode, iataCode))
+        .get();
+      if (!airport) return [];
 
-    getPriorityBoardingRules(iataCode: string): PriorityBoardingRuleInput[] {
-      return getServiceRules(iataCode, 'priority_boarding');
+      return db.select().from(airportServiceRules)
+        .where(and(
+          eq(airportServiceRules.airportId, airport.id),
+          eq(airportServiceRules.serviceType, serviceType),
+        ))
+        .all()
+        .map((r) => ({
+          id:                 r.id,
+          priority:           r.priority,
+          validFrom:          r.validFrom,
+          validTo:            r.validTo ?? null,
+          confidence:         r.confidence,
+          action:             (r.action ?? 'allow') as 'allow' | 'deny',
+          minAllianceTier:    (r.minAllianceTier ?? null) as AllianceTier | null,
+          carrierRestriction: r.carrierRestriction ?? null,
+          conditions:         (r.conditions as Condition) ?? null,
+          provider:           r.provider ?? null,
+          notes:              r.notes ?? null,
+        }));
     },
   };
-}
-
-function getServiceRules(
-  iataCode: string,
-  serviceType: ServiceType,
-): FastTrackRuleInput[] {
-  const airport = db.select().from(airports)
-    .where(eq(airports.iataCode, iataCode))
-    .get();
-  if (!airport) return [];
-
-  return db.select().from(airportServiceRules)
-    .where(and(
-      eq(airportServiceRules.airportId, airport.id),
-      eq(airportServiceRules.serviceType, serviceType),
-    ))
-    .all()
-    .map((r) => ({
-      id:                 r.id,
-      priority:           r.priority,
-      validFrom:          r.validFrom,
-      validTo:            r.validTo ?? null,
-      confidence:         r.confidence,
-      minAllianceTier:    (r.minAllianceTier ?? null) as AllianceTier | null,
-      carrierRestriction: r.carrierRestriction ?? null,
-      conditions:         (r.conditions as Condition) ?? null,
-    }));
 }
