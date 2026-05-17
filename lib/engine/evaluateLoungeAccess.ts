@@ -8,6 +8,14 @@ import type {
 } from './types';
 import { evalCondition, meetsTier, type EvalCtx } from './predicates';
 
+// ─── Confidence → status ──────────────────────────────────────────────────────
+
+function confidenceToStatus(confidence: number): AccessResult['status'] {
+  if (confidence >= 0.85) return 'allowed';
+  if (confidence >= 0.60) return 'likely_allowed';
+  return 'not_enough_info';
+}
+
 // ─── Tier → alliance ──────────────────────────────────────────────────────────
 
 function tierToAlliance(tier: AllianceTier): AllianceCode {
@@ -99,7 +107,7 @@ function evaluateChannelRule(
       }
 
       return {
-        status:       'allowed',
+        status:       confidenceToStatus(rule.confidence),
         confidence:   rule.confidence,
         reason:       `Access granted via ${status.allianceTier} status`,
         guest_allowed: false,
@@ -113,7 +121,7 @@ function evaluateChannelRule(
         !rule.carrierRestriction.includes(passenger.operatingCarrier)
       ) return null;
       return {
-        status:       'allowed',
+        status:       confidenceToStatus(rule.confidence),
         confidence:   rule.confidence,
         reason:       `Access granted for ${passenger.operatingCarrier} passengers`,
         guest_allowed: false,
@@ -128,7 +136,7 @@ function evaluateChannelRule(
     case 'invitation': {
       if (!passengerCards.has(channel.channelType)) return null;
       return {
-        status:       'allowed',
+        status:       confidenceToStatus(rule.confidence),
         confidence:   rule.confidence,
         reason:       `Access granted via ${channel.channelType}`,
         guest_allowed: channel.channelType !== 'invitation',
