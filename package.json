@@ -11,7 +11,8 @@
     "db:seed": "tsx db/seed.ts",
     "db:studio": "drizzle-kit studio",
     "test": "node --require tsx/cjs --test 'lib/**/__tests__/*.test.ts'",
-    "test:integration": "node --require tsx/cjs --test 'lib/entitlements/__tests__/integration.test.ts'"
+    "test:integration": "node --require tsx/cjs --test 'lib/entitlements/__tests__/integration.test.ts'",
+    "compare-engines": "tsx scripts/compare-engines.ts"
   },
   "dependencies": {
     "better-sqlite3": "^12.10.0",
