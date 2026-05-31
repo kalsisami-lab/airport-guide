@@ -69,6 +69,7 @@ function makeLounge(
     openingHours,
     tier,
     loungeClass,
+    area: 'all',
     locationDescription: null,
     amenities: null,
     channels: [{

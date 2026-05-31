@@ -1,3 +1,5 @@
+/** @deprecated — replaced by lib/entitlements/findEntitlementsAtAirport.ts
+ *  Kept for compare-engines harness. Do not call from UI. */
 import type { AILounge, LoungeNetwork, LoungeClass } from './aiLounge';
 import {
   CARRIER_ALLIANCE,

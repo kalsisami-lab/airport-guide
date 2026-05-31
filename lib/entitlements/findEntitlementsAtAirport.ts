@@ -56,6 +56,7 @@ export function findEntitlementsAtAirport(
         openingHours:        lounge.openingHours,
         tier:                lounge.tier,
         loungeClass:         lounge.loungeClass,
+        area:                (lounge as LoungeInputWithMeta).area ?? 'all',
         locationDescription: lounge.locationDescription,
         amenities:           lounge.amenities,
       },

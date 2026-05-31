@@ -108,6 +108,14 @@ NO1 LOUNGE Arlanda: Priority Pass / LoungeKey.`);
     ctx_lines.push(`Alliance access: ${ctx.allianceAccess.alliance} ${ctx.allianceAccess.tier}`);
   }
 
+  if (ctx.entitlements_summary) {
+    const es = ctx.entitlements_summary;
+    if (es.alliance_tier) ctx_lines.push(`Alliance tier: ${es.alliance_tier}`);
+    ctx_lines.push(`Fast Track: ${es.fast_track_status}`);
+    if (es.accessible_lounge_count > 0)
+      ctx_lines.push(`Engine-confirmed accessible lounges: ${es.accessible_lounge_count}`);
+  }
+
   if (ctx.lounges && ctx.lounges.length > 0) {
     const accessible = ctx.lounges.filter((l) => l.accessible);
     const blocked = ctx.lounges.filter((l) => !l.accessible);

@@ -92,4 +92,5 @@ export interface AccessResult {
   reason: string;
   guest_allowed: boolean;
   source: string;
+  accessVia?: string;  // human-readable label: "Priority Pass", "oneworld Sapphire", …
 }

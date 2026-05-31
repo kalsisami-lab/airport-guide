@@ -3,6 +3,16 @@ import type { AccessResult } from '../engine/types';
 import type { AirportServiceRuleInput, ServiceType } from './types';
 import { evalCondition, meetsTier, type EvalCtx } from '../engine/predicates';
 
+const TIER_LABEL: Partial<Record<AllianceTier, string>> = {
+  oneworld_emerald:  'oneworld Emerald',
+  oneworld_sapphire: 'oneworld Sapphire',
+  oneworld_ruby:     'oneworld Ruby',
+  star_gold:         'Star Alliance Gold',
+  star_silver:       'Star Alliance Silver',
+  skyteam_elite_plus:'SkyTeam Elite Plus',
+  skyteam_elite:     'SkyTeam Elite',
+};
+
 function toISODate(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
@@ -132,6 +142,9 @@ export function evaluateAirportService(
 
       const tierNote     = rule.minAllianceTier ? ` (${rule.minAllianceTier})` : '';
       const providerNote = rule.provider        ? ` via ${rule.provider}`       : '';
+      const accessVia    = rule.minAllianceTier
+        ? (TIER_LABEL[rule.minAllianceTier] ?? rule.minAllianceTier)
+        : rule.provider ?? undefined;
 
       return {
         status:        confidenceToStatus(rule.confidence),
@@ -139,6 +152,7 @@ export function evaluateAirportService(
         reason:        `${serviceType} access granted${tierNote}${providerNote}`,
         guest_allowed: false,
         source:        `rule:${rule.id}`,
+        accessVia,
       };
     }
   }

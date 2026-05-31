@@ -6,7 +6,7 @@ import { AIRPORT_META } from '@/lib/airportCountryData';
 interface AviationFlightRow {
   flight:    { iata?: string };
   airline:   { name?: string };
-  departure: { iata?: string; airport?: string; scheduled?: string };
+  departure: { iata?: string; airport?: string; scheduled?: string; terminal?: string; gate?: string };
   arrival:   { iata?: string; airport?: string; scheduled?: string };
   aircraft:  { iata?: string } | null;
 }
@@ -18,7 +18,17 @@ function formatTime(iso?: string): string {
   return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
 }
 
-function mapAviationRow(row: AviationFlightRow, flightNumber: string): GlobalSearchResult | null {
+function toYesterdayISO(): string {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
+function mapAviationRow(
+  row: AviationFlightRow,
+  flightNumber: string,
+  prevRow?: AviationFlightRow,
+): GlobalSearchResult | null {
   const depIata = row.departure.iata;
   const arrIata = row.arrival.iata;
   if (!depIata || !arrIata) return null;
@@ -26,9 +36,9 @@ function mapAviationRow(row: AviationFlightRow, flightNumber: string): GlobalSea
   const arrMeta = AIRPORT_META[arrIata];
   return {
     flightNumber,
-    airline:       row.airline.name ?? 'Unknown',
-    source:        'global-db',
-    confidence:    'confirmed',
+    airline:           row.airline.name ?? 'Unknown',
+    source:            'global-db',
+    confidence:        'confirmed',
     origin: {
       iata: depIata,
       name: row.departure.airport ?? depMeta?.city ?? depIata,
@@ -40,9 +50,12 @@ function mapAviationRow(row: AviationFlightRow, flightNumber: string): GlobalSea
       country:  arrMeta?.country ?? 'Unknown',
       schengen: arrMeta?.inSchengen ?? false,
     },
-    departureTime: formatTime(row.departure.scheduled),
-    arrivalTime:   formatTime(row.arrival.scheduled),
-    aircraft:      row.aircraft?.iata ?? 'Unknown',
+    departureTime:    formatTime(row.departure.scheduled),
+    arrivalTime:      formatTime(row.arrival.scheduled),
+    aircraft:         row.aircraft?.iata ?? 'Unknown',
+    // Previous day's confirmed terminal/gate — proxy for today's unassigned data
+    previousGate:     prevRow?.departure.gate     ?? row.departure.gate     ?? undefined,
+    previousTerminal: prevRow?.departure.terminal ?? row.departure.terminal ?? undefined,
   };
 }
 
@@ -57,24 +70,32 @@ export async function GET(req: NextRequest) {
 
   if (apiKey) {
     try {
-      // Fetch up to 5 records — the API may return multiple dates; pick the one closest to now
-      const url = `https://api.aviationstack.com/v1/flights?access_key=${apiKey}&flight_iata=${flight}&limit=5`;
-      const res = await fetch(url, { next: { revalidate: 1800 } });
-      if (res.ok) {
-        const json = await res.json() as AviationResponse;
-        const rows = (json.data ?? []).filter((r) => r.departure?.iata && r.arrival?.iata);
+      const yesterday = toYesterdayISO();
+      // Fetch today's data + yesterday's confirmed data (for terminal/gate proxy)
+      const [todayRes, prevRes] = await Promise.all([
+        fetch(`https://api.aviationstack.com/v1/flights?access_key=${apiKey}&flight_iata=${flight}&limit=5`,
+          { next: { revalidate: 1800 } }),
+        fetch(`https://api.aviationstack.com/v1/flights?access_key=${apiKey}&flight_iata=${flight}&flight_date=${yesterday}&limit=3`,
+          { next: { revalidate: 3600 } }),
+      ]);
 
-        // Sort rows by how close their scheduled departure is to right now; pick the nearest
-        const now = Date.now();
-        const sorted = rows
-          .map((r) => ({ r, delta: Math.abs(new Date(r.departure.scheduled ?? 0).getTime() - now) }))
-          .sort((a, b) => a.delta - b.delta);
+      const todayRows: AviationFlightRow[] = todayRes.ok
+        ? ((await todayRes.json() as AviationResponse).data ?? []).filter((r) => r.departure?.iata && r.arrival?.iata)
+        : [];
+      const prevRows: AviationFlightRow[] = prevRes.ok
+        ? ((await prevRes.json() as AviationResponse).data ?? []).filter((r) => r.departure?.iata && r.arrival?.iata)
+        : [];
 
-        const best = sorted[0]?.r ?? rows[0];
-        if (best) {
-          const result = mapAviationRow(best, flight);
-          if (result) return NextResponse.json({ result, source: 'aviationstack' });
-        }
+      // Sort today's rows by closeness to now; pick the best
+      const now = Date.now();
+      const sorted = todayRows
+        .map((r) => ({ r, delta: Math.abs(new Date(r.departure.scheduled ?? 0).getTime() - now) }))
+        .sort((a, b) => a.delta - b.delta);
+
+      const best = sorted[0]?.r ?? todayRows[0];
+      if (best) {
+        const result = mapAviationRow(best, flight, prevRows[0]);
+        if (result) return NextResponse.json({ result, source: 'aviationstack' });
       }
     } catch (err) {
       console.error('Aviationstack fetch failed:', err);

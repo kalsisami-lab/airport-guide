@@ -57,6 +57,7 @@ export function createAirportRepository(): AirportRepository {
         openingHours:        l.openingHours ?? null,
         tier:                l.tier,
         loungeClass:         l.loungeClass,
+        area:                l.area ?? 'all',
         locationDescription: l.locationDescription ?? null,
         amenities:           l.amenities ?? null,
         channels: channelRows

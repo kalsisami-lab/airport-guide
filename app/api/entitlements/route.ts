@@ -28,6 +28,7 @@ interface EntitlementRequest {
     departureTime?:       string;
     departureCountryCode?: string;
     sameDayDeparture?:   boolean;
+    gate?:               string;
   };
   user: {
     statusCards: { programCode: string; tierName: string }[];
@@ -82,6 +83,7 @@ export async function POST(req: NextRequest) {
     departureTime:        parsed.flight.departureTime,
     departureCountryCode: parsed.flight.departureCountryCode?.toUpperCase(),
     sameDayDeparture:     parsed.flight.sameDayDeparture,
+    gate:                 parsed.flight.gate,
   };
 
   const user: UserInput = {

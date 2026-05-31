@@ -23,6 +23,7 @@ export interface FlightRequest {
   departureTime?: string;         // ISO 8601
   departureCountryCode?: string;
   sameDayDeparture?: boolean;
+  gate?: string;                  // departure gate — used for walking-time hints in UI
 }
 
 // ─── Fast track ───────────────────────────────────────────────────────────────
@@ -83,6 +84,7 @@ export interface LoungeEntitlement {
     openingHours:        string | null;
     tier:                string;
     loungeClass:         string;
+    area:                string;   // 'schengen' | 'non_schengen' | 'international' | 'all'
     locationDescription: string | null;
     amenities:           string[] | null;
   };
@@ -117,6 +119,7 @@ export const STATUS_SORT: Record<AccessStatus, number> = {
 export interface LoungeMeta {
   tier:                string;
   loungeClass:         string;
+  area:                string;   // 'schengen' | 'non_schengen' | 'international' | 'all'
   locationDescription: string | null;
   amenities:           string[] | null;
 }

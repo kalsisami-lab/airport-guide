@@ -10,6 +10,12 @@ export interface ChatContext {
   fastTrack?: boolean;
   lounges?: { name: string; reason: string; accessible: boolean; tier: string; amenities?: string[] }[];
   allianceAccess?: { alliance: string; tier: string } | null;
+  // Enriched summary from the new entitlements engine (optional — absent when engine not yet loaded)
+  entitlements_summary?: {
+    alliance_tier: string | null;
+    fast_track_status: string;
+    accessible_lounge_count: number;
+  } | null;
 }
 
 export interface ChatMessage {

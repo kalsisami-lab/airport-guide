@@ -9,6 +9,7 @@ export type FlightInfo = {
   arrivalTime: string;
   aircraft: string;
   previousGate?: string;
+  previousTerminal?: string;  // terminal from yesterday's flight — proxy for today's assignment
 };
 
 type RouteRecord = Omit<FlightInfo, 'flightNumber'>;

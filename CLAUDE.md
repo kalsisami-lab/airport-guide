@@ -22,9 +22,9 @@ closed), `confidence` (0..1), and human-readable `reason`.
 ## Tech stack
 - **Language:** TypeScript (strict mode)
 - **Framework:** Next.js 15, App Router, React — no Pages Router
-- **Database:** None yet — rules currently live in static `.ts` files under `/data/` and `/data/lounges/`
-- **ORM:** None yet
-- **Test framework:** None yet — type-checking via `npx tsc --noEmit`, linting via ESLint
+- **Database:** SQLite via `better-sqlite3` (`db/entitlements.sqlite`) — 1 159 airports, 720 lounge rules, 21 alliance rule templates
+- **ORM:** Drizzle ORM (`db/schema.ts`, `db/client.ts`)
+- **Test framework:** `node --test` (built-in) — 95-case corpus in `lib/entitlements/__tests__/` + `lib/normalization/__tests__/`
 - **Build / dev:** Turbopack (`npm run dev`), standard Next.js production build (`npm run build`)
 - **PWA:** `app/manifest.ts` + `/public/sw.js` (cache-first, no webpack plugin)
 
@@ -34,39 +34,42 @@ npm run dev       # Dev server — http://localhost:3000 (Turbopack)
 npm run build     # Production build
 npm run lint      # ESLint
 npx tsc --noEmit  # Type-check without emitting
+npm test          # node --test runner (lib/entitlements, lib/normalization, lib/engine)
+npm run compare-engines  # Diff old vs new engine on 95-case corpus
 ```
 
-## Current architecture (as-is, to be evolved)
+## Current architecture
 
-### Static rule data (`/data/`)
-No database — entitlement rules are TypeScript objects compiled into the bundle.
-- `data/lounges/` — lounge definitions split by alliance (`oneworld.ts`, `starAlliance.ts`, `skyteam.ts`, `independent.ts`) plus card-network lounges (`cardAndPerksData.ts`)
-- `data/allianceRules.ts` — carrier→alliance mapping, status→tier mapping, tier→lounge class access matrix
-- `data/airlineStatuses.ts` — loyalty programme definitions with `accessMethods[]`
-- `data/creditCards.ts` — card definitions with `loungeAccess[]` networks
+### Rule database (`db/`)
+SQLite via Drizzle ORM. Schema in `db/schema.ts`. Seed scripts in `scripts/`.
+- `db/entitlements.sqlite` — 1 159 airports, 720 lounge rules, 21 alliance rule templates
+- Rules: alliances → airlines → FFPs → status tiers; lounges → access channels → rules
 
-### Entitlement filter (`/lib/loungeFilter.ts`)
-`applyHardFilter(lounges, ctx)` — evaluates each lounge against a `FilterContext`.
-Key fields: `operatingCarrierCode`, `statusAccessMethods`, `cardNetworks`, `allowedAirlines`, `allianceAccess`.
-
-`allianceAccess` controls the carrier check for alliance lounges:
-- `'all-alliance'` — any carrier in the alliance + Sapphire/Emerald/Gold → access
-- `'carrier-specific'` — carrier must be in `allowedAirlines` + tier must match
-
-### Alliance-isolated router (`/data/lounges/index.ts`)
-`getLoungeCandidates(params)` — returns only the relevant alliance pool (oneworld OR star-alliance OR skyteam, never mixed) plus any card-network lounges, then deduplicates.
+### New entitlement engine (`lib/entitlements/`, `lib/engine/`, `lib/airport-services/`, `lib/normalization/`)
+The production path for all lounge and airport-service decisions.
+- `lib/entitlements/findEntitlementsAtAirport.ts` — main entry point; returns `AirportEntitlements`
+- `lib/engine/evaluateLoungeAccess.ts` — per-lounge rule evaluation; returns `AccessResult` with 9-value status enum
+- `lib/airport-services/findAirportServices.ts` — evaluates fast_track, priority_checkin, priority_boarding, priority_baggage
+- `lib/normalization/normalize.ts` — maps (carrier, status card) → (PassengerContext, StatusContext)
 
 ### API routes (`/app/api/`)
-- `POST /api/lounges` — resolves eligible lounges for a given flight + profile
+- `POST /api/entitlements` — **production lounge + services path**; calls `findEntitlementsAtAirport`
+- `POST /api/lounges` — **legacy** static-data path (@deprecated; kept for compare-engines harness)
 - `POST /api/chat` — Gemini 2.5 Flash travel assistant (1500-token cap, language-mirroring prompt)
 - `GET /api/flight` — flight number lookup from static database
 - `GET /api/airports` — airport search
 
 ### UI (`/components/`)
-- `Dashboard.tsx` — page orchestrator; owns all state
-- `LoungeCard.tsx` — renders one lounge with tier styling and walking time
-- `FastTrackStatus.tsx` — binary yes/no fast-track panel
+- `Dashboard.tsx` — page orchestrator; owns all state; uses `useEntitlements` hook → `POST /api/entitlements`
+- `EntitlementLoungeCard.tsx` — renders one `LoungeEntitlement` with 7-status visual + tap-expand reason
+- `AirportServicesPanel.tsx` — shows all 4 airport services (fast track, check-in, boarding, baggage) as chips
+- `TravelAssistant.tsx` — Gemini chat, receives enriched `ChatContext` including entitlements summary
 - `SelectInput.tsx` — searchable dropdown
+
+### Legacy (kept for compare-engines harness, not used by UI)
+- `lib/loungeFilter.ts` — @deprecated; old boolean filter
+- `lib/eligibility.ts` — @deprecated; old eligibility helpers
+- `components/_v1-backup/` — V1 snapshots before engine swap; do not import
 
 ## What NOT to do
 - Do not hardcode airline codes or status names in business logic.

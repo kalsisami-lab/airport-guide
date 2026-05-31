@@ -2,12 +2,10 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import SelectInput from './SelectInput';
-import AirportServicesPanel from './AirportServicesPanel';
-import EntitlementLoungeCard from './EntitlementLoungeCard';
-import GlobalAllianceCard from './GlobalAllianceCard';
+import FastTrackStatus from './FastTrackStatus';
+import AILoungeCard from './AILoungeCard';
 import TravelAssistant from './TravelAssistant';
 import Settings, { LS_FLIGHT_API_KEY } from './Settings';
-import type { AllianceAccess } from '@/lib/eligibility';
 import { airports, AIRLINE_HUB, type Airport } from '@/data/airports';
 import { AIRPORT_META, getRegionLabel } from '@/lib/airportCountryData';
 import { useAirportSearch } from '@/hooks/useAirportSearch';
@@ -19,21 +17,11 @@ import { CARRIER_ALLIANCE } from '@/data/allianceRules';
 import { getFlightDirectionHint } from '@/lib/flightDirection';
 import { useFlightLookup } from '@/hooks/useFlightLookup';
 import { useGlobalFlightSearch } from '@/hooks/useGlobalFlightSearch';
-import { useEntitlements } from '@/hooks/useEntitlements';
+import { useAILounges } from '@/hooks/useAILounges';
 import type { ChatContext } from '@/lib/chatTypes';
 
 const LS_CARD   = 'airport-guide:cardId';
 const LS_STATUS = 'airport-guide:statusId';
-
-const TIER_TO_ALLIANCE: Record<string, AllianceAccess> = {
-  oneworld_emerald:   { alliance: 'oneworld',      tier: 'Emerald',    message: 'Access to First and Business class oneworld lounges worldwide' },
-  oneworld_sapphire:  { alliance: 'oneworld',      tier: 'Sapphire',   message: 'Access to Business class oneworld lounges worldwide' },
-  oneworld_ruby:      { alliance: 'oneworld',      tier: 'Ruby',       message: 'Discounted access at select oneworld lounges' },
-  star_gold:          { alliance: 'star-alliance', tier: 'Gold',       message: 'Access to Business class Star Alliance lounges worldwide' },
-  star_silver:        { alliance: 'star-alliance', tier: 'Silver',     message: 'Limited lounge access on Star Alliance carriers' },
-  skyteam_elite_plus: { alliance: 'skyteam',       tier: 'Elite Plus', message: 'Access to Business class SkyTeam lounges worldwide' },
-  skyteam_elite:      { alliance: 'skyteam',       tier: 'Elite',      message: 'Limited lounge access at select SkyTeam lounges' },
-};
 
 // Pinned airports always appear at the top of the dropdown when no search query
 const PINNED_IATAS = new Set(airports.map((a) => a.iata));
@@ -56,6 +44,11 @@ const areaOptions: { value: 'schengen' | 'non-schengen' | 'both'; label: string;
   { value: 'non-schengen', label: 'Non-Schengen',     sublabel: 'Flights outside Schengen Area' },
 ];
 
+const FAST_TRACK_TIERS = new Set([
+  'oneworld-emerald', 'oneworld-sapphire', 'star-alliance-gold',
+  'skyteam-elite-plus', 'finnair-plus-platinum', 'finnair-plus-gold',
+]);
+
 export default function Dashboard() {
   const [airportIata, setAirportIata]           = useState<string | null>(null);
   const [airportManuallySet, setAirportManuallySet] = useState(false);
@@ -67,7 +60,6 @@ export default function Dashboard() {
   const [gateInput, setGateInput]               = useState('');
   const [gateManuallySet, setGateManuallySet]   = useState(false);
   const [manualArea, setManualArea]             = useState<'schengen' | 'non-schengen' | 'both'>('both');
-  const [cabin, setCabin]                       = useState<'economy' | 'business' | 'first'>('economy');
   const [manualDestIata, setManualDestIata]     = useState<string | null>(null);
   const [hydrated, setHydrated]                 = useState(false);
   const [flightApiKey, setFlightApiKey]         = useState<string | null>(null);
@@ -261,66 +253,50 @@ export default function Dashboard() {
   const departureZone: 'schengen' | 'non-schengen' | 'international' =
     area === 'both' ? 'international' : area;
 
-  // Entitlement engine — fires whenever airport, credentials, carrier, or destination change
-  const entState = useEntitlements({
+  // AI lounge lookup — fires whenever airport, credentials, carrier, or departure zone change
+  const aiState = useAILounges({
     airportIata,
-    arrivalIata:          resolvedDest?.iata ?? null,
+    airportName:          airport?.name ?? null,
+    airline:              rawFlight?.airline ?? undefined,
     operatingCarrierCode: airlineCode || null,
     card,
     status,
-    gate:  gateInput || undefined,
-    cabin,
+    departureZone,
+    destination: resolvedDest?.city ?? undefined,
+    gate:        gateInput || undefined,
   });
 
-  const entitlements = entState.phase === 'done' ? entState.data : null;
+  // Fast Track eligibility: airline status OR credit card perk
+  const hasFastTrack = useMemo(
+    () =>
+      (!!status && status.accessMethods.some((m) => FAST_TRACK_TIERS.has(m))) ||
+      !!card?.fastTrack,
+    [status, card],
+  );
+  const fastTrackReasons = useMemo(() => {
+    const reasons: string[] = [];
+    if (status && status.accessMethods.some((m) => FAST_TRACK_TIERS.has(m))) reasons.push(status.name);
+    if (card?.fastTrack) reasons.push(card.name);
+    return reasons;
+  }, [status, card]);
 
-  // Fast Track derived from engine result (falls back to false while loading)
-  const hasFastTrack = useMemo(() => {
-    if (!entitlements) return false;
-    const ft = entitlements.services.fast_track_security.status;
-    return ft === 'allowed' || ft === 'likely_allowed';
-  }, [entitlements]);
+  const chatContext = useMemo<ChatContext>(() => ({
+    airport:     airport?.name ?? null,
+    airportIata: airportIata ?? null,
+    gate:        gateInput || null,
+    cardName:    card?.name ?? null,
+    statusName:  status?.name ?? null,
+    flightNumber: flightNumber || null,
+    destination: resolvedDest?.city ?? null,
+    area:        area === 'both' ? null : area,
+    fastTrack:   hasFastTrack,
+    lounges:     aiState.phase === 'done'
+      ? aiState.lounges.map((l) => ({ name: l.name, reason: l.accessMethod, accessible: true, tier: l.tier, amenities: l.amenities }))
+      : [],
+    allianceAccess: null,
+  }), [airport, airportIata, gateInput, card, status, flightNumber, resolvedDest, area, hasFastTrack, aiState]);
 
-  const allianceAccess = useMemo<AllianceAccess | null>(() => {
-    const tier = entitlements?.status?.allianceTier;
-    if (!tier || tier === 'none') return null;
-    return TIER_TO_ALLIANCE[tier] ?? null;
-  }, [entitlements]);
-
-  const chatContext = useMemo<ChatContext>(() => {
-    const accessible = entitlements?.lounges.filter(
-      (l) => l.access.status === 'allowed' || l.access.status === 'likely_allowed',
-    ) ?? [];
-    return {
-      airport:      airport?.name ?? null,
-      airportIata:  airportIata ?? null,
-      gate:         gateInput || null,
-      cardName:     card?.name ?? null,
-      statusName:   status?.name ?? null,
-      flightNumber: flightNumber || null,
-      destination:  resolvedDest?.city ?? null,
-      area:         area === 'both' ? null : area,
-      fastTrack:    hasFastTrack,
-      lounges: accessible.map((l) => ({
-        name:       l.lounge.name,
-        reason:     l.access.accessVia ?? l.access.reason,
-        accessible: true,
-        tier:       l.lounge.tier,
-        amenities:  l.lounge.amenities ?? [],
-      })),
-      allianceAccess: null,
-      entitlements_summary: entitlements
-        ? {
-            alliance_tier:           entitlements.status?.allianceTier ?? null,
-            fast_track_status:       entitlements.services.fast_track_security.status,
-            accessible_lounge_count: accessible.length,
-          }
-        : null,
-    };
-  }, [airport, airportIata, gateInput, card, status, flightNumber, resolvedDest, area, hasFastTrack, entitlements]);
-
-  const historicalGate     = rawFlight?.previousGate     ?? null;
-  const historicalTerminal = rawFlight?.previousTerminal ?? null;
+  const historicalGate = rawFlight?.previousGate ?? null;
 
   // Auto-fill gate from historical data when a flight resolves, unless user typed one already
   useEffect(() => {
@@ -585,28 +561,6 @@ export default function Dashboard() {
                 icon="🌍"
               />
             )}
-
-            {/* Cabin class */}
-            <div>
-              <label className="block text-xs font-semibold uppercase tracking-widest text-slate-400 mb-2">
-                <span className="mr-1">💺</span>Cabin Class
-              </label>
-              <div className="flex gap-2">
-                {(['economy', 'business', 'first'] as const).map((c) => (
-                  <button
-                    key={c}
-                    onClick={() => setCabin(c)}
-                    className={`flex-1 py-2 rounded-xl text-xs font-semibold border transition-colors capitalize ${
-                      cabin === c
-                        ? 'bg-blue-600 border-blue-500 text-white'
-                        : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-500'
-                    }`}
-                  >
-                    {c.charAt(0).toUpperCase() + c.slice(1)}
-                  </button>
-                ))}
-              </div>
-            </div>
           </div>
 
           {/* ── 2. Profile ───────────────────────────────────────────────── */}
@@ -693,15 +647,13 @@ export default function Dashboard() {
                   className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 outline-none focus:border-blue-500 transition-colors"
                 />
               </div>
-              {(historicalGate || historicalTerminal) && (
+              {historicalGate && (
                 <p className="mt-1.5 text-xs text-slate-500 flex items-center gap-1">
                   <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                       d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  Yesterday:{historicalTerminal ? ` Terminal ${historicalTerminal}` : ''}
-                  {historicalTerminal && historicalGate ? ' ·' : ''}
-                  {historicalGate ? ` Gate ${historicalGate}` : ''}
+                  Yesterday this flight departed from Gate {historicalGate}
                 </p>
               )}
             </div>
@@ -729,22 +681,10 @@ export default function Dashboard() {
               )}
             </div>
 
-            {/* Airport services: fast track, check-in, boarding, baggage */}
-            {entitlements && (
-              <AirportServicesPanel services={entitlements.services} />
-            )}
+            <FastTrackStatus hasFastTrack={hasFastTrack} reasons={fastTrackReasons} />
 
-            {/* Alliance status card — shown when user has qualifying elite status */}
-            {allianceAccess && airportIata && (
-              <GlobalAllianceCard
-                access={allianceAccess}
-                iataCode={airportIata}
-                gateLabel={gateInput || undefined}
-              />
-            )}
-
-            {/* Lounge loading state */}
-            {entState.phase === 'fetching' && (
+            {/* AI lounge states */}
+            {(aiState.phase === 'fetching' || aiState.phase === 'verifying') && (
               <div className="space-y-3">
                 <div className="rounded-2xl border p-5 bg-slate-800/60 border-slate-700/60">
                   <div className="flex items-center gap-2.5 mb-4">
@@ -752,7 +692,9 @@ export default function Dashboard() {
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
                       <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-500" />
                     </span>
-                    <span className="text-sm text-slate-300 font-medium">Checking lounge access…</span>
+                    <span className="text-sm text-slate-300 font-medium">
+                      {aiState.phase === 'fetching' ? 'Checking lounge access…' : 'Verifying access rules…'}
+                    </span>
                   </div>
                   <div className="space-y-2 animate-pulse">
                     <div className="h-4 bg-slate-700/60 rounded-full w-3/4" />
@@ -764,16 +706,22 @@ export default function Dashboard() {
                     </div>
                   </div>
                 </div>
+                <div className="rounded-2xl border p-5 bg-slate-800/40 border-slate-700/40 animate-pulse opacity-50">
+                  <div className="space-y-2">
+                    <div className="h-4 bg-slate-700/60 rounded-full w-2/3" />
+                    <div className="h-3 bg-slate-700/40 rounded-full w-1/3" />
+                  </div>
+                </div>
               </div>
             )}
 
-            {entState.phase === 'error' && (
+            {aiState.phase === 'error' && (
               <div className="rounded-2xl bg-slate-800/60 border border-red-500/20 p-6 text-center">
                 <div className="text-3xl mb-2">⚠️</div>
                 <p className="text-slate-300 font-medium">Could not load lounge data</p>
-                <p className="text-slate-500 text-sm mt-1">{entState.message}</p>
+                <p className="text-slate-500 text-sm mt-1">{aiState.message}</p>
                 <button
-                  onClick={entState.refetch}
+                  onClick={aiState.refetch}
                   className="mt-3 text-xs text-blue-400 hover:text-blue-300 transition-colors underline underline-offset-2"
                 >
                   Try again
@@ -781,7 +729,7 @@ export default function Dashboard() {
               </div>
             )}
 
-            {entitlements && entitlements.lounges.length === 0 && (
+            {aiState.phase === 'done' && aiState.lounges.length === 0 && (
               <div className="rounded-2xl bg-slate-800/60 border border-slate-700/60 p-6 text-center">
                 <div className="text-3xl mb-2">🚫</div>
                 <p className="text-slate-300 font-medium">No lounge access found</p>
@@ -791,16 +739,14 @@ export default function Dashboard() {
               </div>
             )}
 
-            {entitlements && entitlements.lounges.length > 0 && (
+            {aiState.phase === 'done' && aiState.lounges.length > 0 && (
               <div className="space-y-3">
-                {entitlements.lounges.map((ent, i) => (
-                  <EntitlementLoungeCard
-                    key={ent.lounge.id}
-                    entitlement={ent}
-                    isBest={i === 0 && (ent.access.status === 'allowed' || ent.access.status === 'likely_allowed')}
-                    passengerTerminalId={undefined}
-                  />
+                {aiState.lounges.map((l, i) => (
+                  <AILoungeCard key={l.id} lounge={l} isBest={i === 0} />
                 ))}
+                {aiState.notes && (
+                  <p className="text-xs text-slate-500 px-1">{aiState.notes}</p>
+                )}
               </div>
             )}
 

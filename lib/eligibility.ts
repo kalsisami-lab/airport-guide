@@ -1,3 +1,5 @@
+/** @deprecated — replaced by lib/entitlements/findEntitlementsAtAirport.ts
+ *  Kept for compare-engines harness. Do not call from UI. */
 import type { CreditCard } from '@/data/creditCards';
 import type { AirlineStatus, Alliance } from '@/data/airlineStatuses';
 import type { Lounge, LoungeArea } from '@/data/lounges';

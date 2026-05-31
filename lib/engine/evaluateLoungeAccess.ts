@@ -16,6 +16,26 @@ function confidenceToStatus(confidence: number): AccessResult['status'] {
   return 'not_enough_info';
 }
 
+// ─── Tier → human label ───────────────────────────────────────────────────────
+
+const TIER_LABEL: Partial<Record<AllianceTier, string>> = {
+  oneworld_emerald:   'oneworld Emerald',
+  oneworld_sapphire:  'oneworld Sapphire',
+  oneworld_ruby:      'oneworld Ruby',
+  star_gold:          'Star Alliance Gold',
+  star_silver:        'Star Alliance Silver',
+  skyteam_elite_plus: 'SkyTeam Elite Plus',
+  skyteam_elite:      'SkyTeam Elite',
+};
+
+const CHANNEL_LABEL: Partial<Record<string, string>> = {
+  priority_pass:  'Priority Pass',
+  lounge_key:     'LoungeKey',
+  dragon_pass:    'DragonPass',
+  amex_centurion: 'Amex Platinum',
+  invitation:     'Invitation',
+};
+
 // ─── Tier → alliance ──────────────────────────────────────────────────────────
 
 function tierToAlliance(tier: AllianceTier): AllianceCode {
@@ -112,6 +132,7 @@ function evaluateChannelRule(
         reason:       `Access granted via ${status.allianceTier} status`,
         guest_allowed: false,
         source:       `channel:${channel.id}:rule:${rule.id}`,
+        accessVia:    TIER_LABEL[status.allianceTier] ?? status.allianceTier,
       };
     }
 
@@ -126,6 +147,7 @@ function evaluateChannelRule(
         reason:       `Access granted for ${passenger.operatingCarrier} passengers`,
         guest_allowed: false,
         source:       `channel:${channel.id}:rule:${rule.id}`,
+        accessVia:    passenger.operatingCarrier,
       };
     }
 
@@ -141,6 +163,7 @@ function evaluateChannelRule(
         reason:       `Access granted via ${channel.channelType}`,
         guest_allowed: channel.channelType !== 'invitation',
         source:       `channel:${channel.id}:rule:${rule.id}`,
+        accessVia:    CHANNEL_LABEL[channel.channelType] ?? channel.channelType,
       };
     }
 

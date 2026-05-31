@@ -278,3 +278,71 @@ describe('tuntematon kenttä', () => {
     assert.equal(r.lounges.length, 0);
   });
 });
+
+// ─── API contract tests (Vaihe 10) ───────────────────────────────────────────
+// These verify the shape of data that Dashboard → /api/entitlements returns.
+
+describe('API contract: HEL + AY Gold', () => {
+  test('HEL Finnair Lounge on allowed, neljä palvelua tuloksessa', () => {
+    const r = findEntitlementsAtAirport(
+      { statusCards: [{ programCode: 'ay-plus', tierName: 'Gold' }] },
+      { operatingCarrier: 'AY', cabin: 'economy', departureAirport: 'HEL', arrivalAirport: 'FRA' },
+      repos, { now: OPEN },
+    );
+
+    const finAir = r.lounges.find((l) => l.lounge.name === 'Finnair Lounge');
+    assert.ok(finAir, 'Finnair Lounge löytyy listalta');
+    assert.equal(finAir!.access.status, 'allowed', 'Finnair Lounge on allowed AY Gold:lla');
+    assert.ok(typeof finAir!.access.reason === 'string' && finAir!.access.reason.length > 0, 'reason ei ole tyhjä');
+    assert.ok(finAir!.access.confidence >= 0 && finAir!.access.confidence <= 1, 'confidence välillä 0–1');
+
+    // Neljä palvelua
+    const svcKeys = Object.keys(r.services);
+    assert.ok(svcKeys.includes('fast_track_security'),  'fast_track_security');
+    assert.ok(svcKeys.includes('priority_checkin'),     'priority_checkin');
+    assert.ok(svcKeys.includes('priority_boarding'),    'priority_boarding');
+    assert.ok(svcKeys.includes('priority_baggage'),     'priority_baggage');
+
+    // Fast track AY Gold HEL:ssä on allowed
+    assert.equal(r.services.fast_track_security.status, 'allowed', 'fast track allowed AY Gold HEL');
+  });
+});
+
+describe('API contract: JFK ilman statusta', () => {
+  test('JFK ilman statusta → ei allowed-loungeja, kaikki denied tai paid', () => {
+    const r = findEntitlementsAtAirport(
+      { statusCards: [] },
+      { operatingCarrier: 'UNKN', cabin: 'economy', departureAirport: 'JFK', arrivalAirport: 'LHR' },
+      repos, { now: OPEN },
+    );
+
+    const allowed = r.lounges.filter(
+      (l) => l.access.status === 'allowed' || l.access.status === 'likely_allowed',
+    );
+    assert.equal(allowed.length, 0, 'Ei allowed-loungeja ilman statusta JFK:ssa');
+
+    // AirportEntitlements-rakenne on ehjä
+    assert.ok(Array.isArray(r.lounges),        'lounges on array');
+    assert.ok(typeof r.services === 'object',  'services on objekti');
+    assert.ok(typeof r.evaluatedAt === 'string', 'evaluatedAt on string');
+  });
+});
+
+describe('API contract: HEL + AY Gold → kaikki neljä palvelua', () => {
+  test('kaikki neljä palvelua löytyvät ja jokaisella on AccessResult-rakenne', () => {
+    const r = findEntitlementsAtAirport(
+      { statusCards: [{ programCode: 'ay-plus', tierName: 'Gold' }] },
+      { operatingCarrier: 'AY', cabin: 'economy', departureAirport: 'HEL', arrivalAirport: 'FRA' },
+      repos, { now: OPEN },
+    );
+
+    const serviceTypes = ['fast_track_security', 'priority_checkin', 'priority_boarding', 'priority_baggage'] as const;
+    for (const svc of serviceTypes) {
+      const result = r.services[svc];
+      assert.ok(result, `${svc} löytyy`);
+      assert.ok(typeof result.status === 'string',     `${svc}.status on string`);
+      assert.ok(typeof result.confidence === 'number', `${svc}.confidence on number`);
+      assert.ok(typeof result.reason === 'string',     `${svc}.reason on string`);
+    }
+  });
+});
