@@ -1,58 +1,93 @@
 /**
  * Flight direction heuristic for hub-centric carriers.
  *
- * Convention: ODD flight number = outbound from hub; EVEN = inbound to hub.
- * This is a widely-used IATA numbering convention followed by most major carriers.
- * It is a heuristic — use for pre-filling and validation, not as authoritative truth.
+ * Three numbering schemes used across major carriers:
+ *   hub_finnair   — odd = outbound from hub (most carriers)
+ *   hub_lufthansa — even = outbound from hub (LH, BA)
+ *   compass_us    — no parity convention (AA, DL, UA)
+ *
+ * This is a heuristic — use for pre-filling and validation, not as authoritative truth.
+ * The Aviationstack integration in useFlightLookup is the authoritative source.
  */
 
-export interface DirectionHint {
-  /** IATA code of the carrier's primary hub */
-  hubIata: string;
-  /** true = departing FROM the hub; false = arriving AT the hub */
-  isOutbound: boolean;
+type DirectionScheme = 'hub_finnair' | 'hub_lufthansa' | 'compass_us';
+
+interface AirlineConvention {
+  hub: string;
+  scheme: DirectionScheme;
 }
 
-// Hub-centric carriers that follow the odd/even numbering convention
-const HUB_CARRIERS: Record<string, string> = {
-  AY: 'HEL',  // Finnair — Helsinki
-  BA: 'LHR',  // British Airways — Heathrow
-  EK: 'DXB',  // Emirates — Dubai
-  QR: 'DOH',  // Qatar Airways — Doha
-  EY: 'AUH',  // Etihad — Abu Dhabi
-  SQ: 'SIN',  // Singapore Airlines — Changi
-  CX: 'HKG',  // Cathay Pacific — Hong Kong
-  TK: 'IST',  // Turkish Airlines — Istanbul
-  LH: 'FRA',  // Lufthansa — Frankfurt
-  AF: 'CDG',  // Air France — Paris CDG
-  KL: 'AMS',  // KLM — Amsterdam
-  SK: 'ARN',  // SAS — Stockholm
-  IB: 'MAD',  // Iberia — Madrid
-  OS: 'VIE',  // Austrian — Vienna
-  QF: 'SYD',  // Qantas — Sydney
-  JL: 'NRT',  // Japan Airlines — Tokyo Narita
-  NH: 'NRT',  // ANA — Tokyo Narita
+const AIRLINE_DIRECTION_CONVENTIONS: Record<string, AirlineConvention> = {
+  // hub_finnair: odd = outbound from hub
+  AY: { hub: 'HEL', scheme: 'hub_finnair' },
+  EK: { hub: 'DXB', scheme: 'hub_finnair' },
+  QR: { hub: 'DOH', scheme: 'hub_finnair' },
+  EY: { hub: 'AUH', scheme: 'hub_finnair' },
+  SQ: { hub: 'SIN', scheme: 'hub_finnair' },
+  CX: { hub: 'HKG', scheme: 'hub_finnair' },
+  TK: { hub: 'IST', scheme: 'hub_finnair' },
+  AF: { hub: 'CDG', scheme: 'hub_finnair' },
+  KL: { hub: 'AMS', scheme: 'hub_finnair' },
+  SK: { hub: 'ARN', scheme: 'hub_finnair' },
+  IB: { hub: 'MAD', scheme: 'hub_finnair' },
+  OS: { hub: 'VIE', scheme: 'hub_finnair' },
+  QF: { hub: 'SYD', scheme: 'hub_finnair' },
+  JL: { hub: 'NRT', scheme: 'hub_finnair' },
+  NH: { hub: 'NRT', scheme: 'hub_finnair' },
+  // hub_lufthansa: even = outbound from hub
+  LH: { hub: 'FRA', scheme: 'hub_lufthansa' },
+  BA: { hub: 'LHR', scheme: 'hub_lufthansa' },
+  // compass_us: no hub parity convention
+  AA: { hub: 'DFW', scheme: 'compass_us' },
+  DL: { hub: 'ATL', scheme: 'compass_us' },
+  UA: { hub: 'ORD', scheme: 'compass_us' },
 };
 
-/**
- * Returns a direction hint for a hub-centric carrier based on flight number parity.
- *
- * Example:
- *   AY1411 → { hubIata: 'HEL', isOutbound: true }   // odd → departs HEL
- *   AY1412 → { hubIata: 'HEL', isOutbound: false }  // even → arrives HEL
- *
- * Returns null for unknown carriers or malformed flight numbers.
- */
-export function getFlightDirectionHint(flightNumber: string): DirectionHint | null {
+export type DirectionGuess =
+  | { confidence: 'high'; direction: 'outbound' | 'inbound'; from: string; basis: string }
+  | { confidence: 'low';  direction: 'unknown';               basis: string };
+
+export type FlightClass = 'flagship' | 'regular' | 'codeshare' | 'ferry_charter' | 'unknown';
+
+function parseFlightParts(flightNumber: string): { code: string; num: number } | null {
   const match = flightNumber.trim().toUpperCase().match(/^([A-Z]{2})(\d+)$/);
   if (!match) return null;
-
-  const [, code, digits] = match;
-  const hubIata = HUB_CARRIERS[code];
-  if (!hubIata) return null;
-
-  const num = parseInt(digits, 10);
+  const num = parseInt(match[2], 10);
   if (isNaN(num)) return null;
+  return { code: match[1], num };
+}
 
-  return { hubIata, isOutbound: num % 2 === 1 };
+export function getFlightDirectionGuess(flightNumber: string): DirectionGuess {
+  const parsed = parseFlightParts(flightNumber);
+  if (!parsed) return { confidence: 'low', direction: 'unknown', basis: 'not_parseable' };
+
+  const { code, num } = parsed;
+  const convention = AIRLINE_DIRECTION_CONVENTIONS[code];
+  if (!convention) return { confidence: 'low', direction: 'unknown', basis: 'unknown_carrier' };
+
+  if (convention.scheme === 'compass_us') {
+    return { confidence: 'low', direction: 'unknown', basis: 'compass_us_no_parity' };
+  }
+
+  const isOdd      = num % 2 === 1;
+  const isOutbound = convention.scheme === 'hub_finnair' ? isOdd : !isOdd;
+
+  return {
+    confidence: 'high',
+    direction:  isOutbound ? 'outbound' : 'inbound',
+    from:       convention.hub,
+    basis:      convention.scheme,
+  };
+}
+
+export function classifyFlightNumber(flightNumber: string): FlightClass {
+  const parsed = parseFlightParts(flightNumber);
+  if (!parsed) return 'unknown';
+
+  const { num } = parsed;
+  if (num >= 1    && num <= 99)   return 'flagship';
+  if (num >= 100  && num <= 2999) return 'regular';
+  if (num >= 3000 && num <= 8999) return 'codeshare';
+  if (num >= 9000 && num <= 9999) return 'ferry_charter';
+  return 'unknown';
 }

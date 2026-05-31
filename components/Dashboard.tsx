@@ -16,7 +16,7 @@ import { airlineStatuses, type AirlineStatus } from '@/data/airlineStatuses';
 import { destinationsByAirport, type Destination } from '@/data/destinations';
 import { parseAirlineCode } from '@/lib/eligibility';
 import { CARRIER_ALLIANCE } from '@/data/allianceRules';
-import { getFlightDirectionHint } from '@/lib/flightDirection';
+import { getFlightDirectionGuess, classifyFlightNumber } from '@/lib/flightDirection';
 import { useFlightLookup } from '@/hooks/useFlightLookup';
 import { useGlobalFlightSearch } from '@/hooks/useGlobalFlightSearch';
 import { useEntitlements } from '@/hooks/useEntitlements';
@@ -213,14 +213,12 @@ export default function Dashboard() {
         }
       }
     } else if (flightState.status === 'loading' && !airportManuallySet) {
-      // Use direction heuristic: only pre-fill the hub when the flight is OUTBOUND from it.
-      // For inbound (even) flights the hub is the destination, not where the user is now.
-      const hint = getFlightDirectionHint(flightNumber);
-      if (hint) {
-        if (hint.isOutbound) setAirportIata(hint.hubIata);
-        // isOutbound=false → user is arriving at hub, don't pre-fill; wait for flight resolve
-      } else {
-        // Unknown carrier — fall back to hub map without direction check
+      const guess = getFlightDirectionGuess(flightNumber);
+      if (guess.confidence === 'high' && guess.direction === 'outbound') {
+        setAirportIata(guess.from);
+        // high-confidence inbound → hub is the destination; don't pre-fill, wait for flight resolve
+      } else if (guess.confidence === 'low') {
+        // Unknown carrier or no parity convention — fall back to static hub map
         const hub = AIRLINE_HUB[airlineCode];
         if (hub) setAirportIata(hub);
       }
@@ -460,7 +458,9 @@ export default function Dashboard() {
                     <span className="text-blue-400">{globalState.data.airline}</span>
                   )}
                   {localNotFound && globalState.status === 'idle' && flightNumber.length >= 3 && (
-                    <span className="text-slate-500">Not in local DB</span>
+                    <span className="text-slate-500">
+                      {classifyFlightNumber(flightNumber) === 'codeshare' ? 'Codeshare flight' : 'Not in local DB'}
+                    </span>
                   )}
                   {localNotFound && globalState.status === 'not-found' && (
                     <span className="text-slate-500">Not found</span>
