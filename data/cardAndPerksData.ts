@@ -1,9 +1,11 @@
+// @deprecated — Source of truth has moved to the SQLite entitlement database.
+// Run `npx tsx db/patch_card_lounges.ts` to migrate remaining airports.
+// This file is still imported by the legacy compare-engines harness (data/lounges/index.ts).
+// Do NOT delete until all airports are seeded and the harness no longer references it.
+//
 // Consolidated file for all credit-card-based lounge access and travel perks.
 // Covers: Amex Centurion Lounges, restaurant dining credits (Pier Zero at HEL),
 // Plaza Premium Amex partnerships, Priority Pass / LoungeKey / DragonPass lounges.
-//
-// Router (data/lounges/index.ts) imports from this file and decides which subset
-// to include based on the user's cardNetworks array.
 
 import type { StaticLounge } from './lounges/types';
 
