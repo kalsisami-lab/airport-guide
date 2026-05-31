@@ -108,9 +108,9 @@ export const STATUS_SORT: Record<AccessStatus, number> = {
   likely_allowed:         1,
   paid_available:         2,
   physically_unreachable: 3,
-  not_enough_info:        4,
+  closed:                 4,
   denied:                 5,
-  closed:                 6,
+  not_enough_info:        6,
   not_offered_at_airport: 7,
   not_applicable:         8,
 };
