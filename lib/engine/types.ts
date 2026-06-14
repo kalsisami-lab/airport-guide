@@ -72,6 +72,7 @@ export interface LoungeInput {
   name: string;
   terminalId: number | null;
   openingHours: string | null;
+  area?: 'schengen' | 'non_schengen' | 'international' | 'all';
   channels: ChannelInput[];
   exceptions: ExceptionInput[];
 }

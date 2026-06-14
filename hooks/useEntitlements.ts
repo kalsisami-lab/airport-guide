@@ -56,7 +56,7 @@ export function useEntitlements(
   const lastKeyRef    = useRef('');
 
   function doFetch(q: EntitlementsQuery) {
-    if (!q.airportIata || (!q.card && !q.status)) {
+    if (!q.airportIata) {
       setState({ phase: 'idle' });
       return;
     }

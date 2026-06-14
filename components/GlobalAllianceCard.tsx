@@ -65,7 +65,7 @@ export default function GlobalAllianceCard({ access, iataCode, gateLabel }: Prop
             {meta.name} {access.tier} Access
           </h3>
           <p className="text-slate-400 text-xs mt-0.5">
-            {iataCode} · {tier.loungeAccess}
+            Worldwide {tier.loungeAccess} · 1,000+ airports
           </p>
         </div>
         <span className={`shrink-0 text-xs font-medium px-2.5 py-1 rounded-full ${tier.tierBadge}`}>
@@ -73,20 +73,8 @@ export default function GlobalAllianceCard({ access, iataCode, gateLabel }: Prop
         </span>
       </div>
 
-      <p className="text-slate-400 text-sm mb-4 leading-relaxed">{access.message}</p>
-
-      <div className="mb-4">
-        <p className="text-xs text-slate-500 mb-2 font-medium uppercase tracking-wider">
-          Look for partner lounges from
-        </p>
-        <div className="flex flex-wrap gap-1.5">
-          {meta.partners.map((p) => (
-            <span key={p} className="text-xs bg-slate-700/60 text-slate-300 px-2.5 py-1 rounded-full">
-              {p}
-            </span>
-          ))}
-        </div>
-      </div>
+      <p className="text-slate-400 text-sm mb-3 leading-relaxed">{access.message}</p>
+      <p className="text-xs text-slate-500 mb-4">See accessible lounges at this airport in the list below ↓</p>
 
       <div className="flex flex-wrap gap-1.5 mb-4">
         {amenities.map((a) => (

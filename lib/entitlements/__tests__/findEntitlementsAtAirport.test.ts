@@ -2,12 +2,14 @@ import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { findEntitlementsAtAirport } from '../findEntitlementsAtAirport';
 import type {
+  AirportInfo,
   AirportRepository,
   AirportServiceRuleInput,
   FlightRequest,
   Repos,
   UserInput,
 } from '../types';
+import { isSchengenCountry } from '../../schengen';
 import type { ServiceType } from '../../airport-services/types';
 import type { AirlineRepository, AllianceCode, TierRepository } from '../../normalization/types';
 import type { LoungeInputWithMeta } from '../types';
@@ -111,11 +113,15 @@ function makeServiceRule(overrides: Partial<AirportServiceRuleInput> = {}): Airp
 function makeAirportRepo(
   loungesMap: Record<string, LoungeInputWithMeta[]>,
   serviceRulesMap: Partial<Record<string, Partial<Record<ServiceType, AirportServiceRuleInput[]>>>> = {},
+  countryMap: Record<string, string> = {},
 ): AirportRepository {
   return {
-    getLoungesAtAirport: (iata) => loungesMap[iata] ?? [],
-    getAirportServiceRules: (iata, serviceType) =>
-      serviceRulesMap[iata]?.[serviceType] ?? [],
+    getLoungesAtAirport:    (iata) => loungesMap[iata] ?? [],
+    getAirportServiceRules: (iata, serviceType) => serviceRulesMap[iata]?.[serviceType] ?? [],
+    getAirportInfo:         (iata): AirportInfo | null => {
+      const cc = countryMap[iata];
+      return cc ? { countryCode: cc, isSchengen: isSchengenCountry(cc) } : null;
+    },
   };
 }
 

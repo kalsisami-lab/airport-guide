@@ -18,6 +18,7 @@ export interface FlightInput {
   arrivalAirport: string;
   departureTime?: string;         // ISO 8601
   departureCountryCode?: string;  // ISO 3166-1 alpha-2
+  arrivalCountryCode?: string;    // ISO 3166-1 alpha-2 — used for Schengen zone routing
   sameDayDeparture?: boolean;
 }
 
@@ -36,6 +37,8 @@ export interface PassengerContext {
   sameDayDeparture: boolean;
   departureCountryCode: string;
   departureTime?: string;         // ISO 8601 — used for not_applicable checks
+  arrivalCountryCode?: string;    // ISO 3166-1 alpha-2
+  arrivalIsSchengen?: boolean | null;  // null = destination country unknown → skip zone check
 }
 
 export interface StatusContext {

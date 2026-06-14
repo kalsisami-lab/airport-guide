@@ -620,7 +620,7 @@ export default function Dashboard() {
               )}
             </div>
 
-            {rawFlight && !card && !status && (
+            {rawFlight && !airportIata && !card && !status && (
               <div className="rounded-xl bg-blue-500/10 border border-blue-500/20 px-4 py-3">
                 <p className="text-blue-300 text-sm">
                   Add your card or status to see which lounges you can access with this flight.
@@ -789,6 +789,12 @@ export default function Dashboard() {
                   Try adding a Priority Pass card or a qualifying airline status
                 </p>
               </div>
+            )}
+
+            {airportIata && !card && !status && entitlements && entitlements.lounges.length > 0 && (
+              <p className="text-xs text-slate-500 px-1">
+                Showing lounges accessible without a status or card. Add yours above for personalised access.
+              </p>
             )}
 
             {entitlements && entitlements.lounges.length > 0 && (

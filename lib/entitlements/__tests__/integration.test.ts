@@ -48,14 +48,16 @@ describe('HEL', () => {
 
     assert.equal(r.status?.allianceTier, 'oneworld_sapphire');
 
+    // Platinum Wing on non-Schengen-puolella; HEL→FRA on Schengen-lento → ei fyysisesti saavutettavissa
     const platWing = find(r.lounges, 'Finnair Platinum Wing');
-    assert.equal(platWing.access.status, 'denied', 'Platinum Wing vaatii emeraldin');
+    assert.equal(platWing.access.status, 'physically_unreachable', 'Platinum Wing non-Schengen — Schengen-lento ei pääse sinne');
 
-    const ns = find(r.lounges, 'Finnair Lounge');   // first match (Non-Schengen)
+    // Schengen-puolen Finnair Lounge löytyy ensin sort-järjestyksessä (allowed ennen physically_unreachable)
+    const ns = find(r.lounges, 'Finnair Lounge');
     assert.equal(ns.access.status, 'allowed');
 
     const allowed = r.lounges.filter((l) => l.access.status === 'allowed');
-    assert.ok(allowed.length >= 2, 'Vähintään 2 loungea pitää olla allowed (SC + NS)');
+    assert.ok(allowed.length >= 1, 'Vähintään 1 lounge allowed (Schengen Finnair Lounge)');
 
     // Sort order: allowed ennen denied
     assert.equal(r.lounges[0].access.status, 'allowed');
@@ -111,7 +113,7 @@ describe('HEL', () => {
 // ─── FRA ─────────────────────────────────────────────────────────────────────
 
 describe('FRA', () => {
-  test('LH Senator + LX → molemmat Senator-loungit allowed, LH First allowed, fast track available', () => {
+  test('LH Senator + LX economy → molemmat Senator-loungit allowed, LH First denied (cabin=first vaaditaan), fast track available', () => {
     const r = findEntitlementsAtAirport(
       { statusCards: [{ programCode: 'lh-miles-more', tierName: 'Senator' }] },
       { operatingCarrier: 'LX', cabin: 'economy', departureAirport: 'FRA', arrivalAirport: 'ZRH' },
@@ -122,17 +124,18 @@ describe('FRA', () => {
     assert.equal(senators.length, 2, 'SC + non-SC Senator Lounge');
     senators.forEach((l) => assert.equal(l.access.status, 'allowed'));
 
-    // LH First on airline_own [LH, LX, OS, SN] — LX on listalla
+    // Phase 13 fix: FCL requires cabin=first — Senator economy no longer grants access
     const lhFirst = find(r.lounges, 'Lufthansa First Class Lounge');
-    assert.equal(lhFirst.access.status, 'allowed', 'LX in [LH, LX, OS, SN] restriction');
+    assert.equal(lhFirst.access.status, 'denied', 'Senator economy denied FCL — conditions require cabin=first');
 
     assert.equal(r.fastTrack.available, true);
   });
 
-  test('AY Gold 10:30 → JAL Sakura ja Qatar Business allowed (molemmat auki)', () => {
+  test('AY Gold 10:30 → JAL Sakura ja Qatar Business allowed (non-Schengen-kohde)', () => {
+    // FRA→JFK: non-Schengen kohde → non-Schengen loungit ovat fyysisesti saavutettavissa
     const r = findEntitlementsAtAirport(
       { statusCards: [{ programCode: 'ay-plus', tierName: 'Gold' }] },
-      { operatingCarrier: 'AY', cabin: 'economy', departureAirport: 'FRA', arrivalAirport: 'HEL' },
+      { operatingCarrier: 'AY', cabin: 'economy', departureAirport: 'FRA', arrivalAirport: 'JFK' },
       repos, { now: new Date('2025-05-16T10:30:00') },
     );
 
@@ -141,6 +144,20 @@ describe('FRA', () => {
 
     const qr = find(r.lounges, 'Qatar Airways Business Lounge');
     assert.equal(qr.access.status, 'allowed');
+  });
+
+  test('AY Gold 10:30 FRA→HEL (Schengen) → non-Schengen loungit physically_unreachable', () => {
+    const r = findEntitlementsAtAirport(
+      { statusCards: [{ programCode: 'ay-plus', tierName: 'Gold' }] },
+      { operatingCarrier: 'AY', cabin: 'economy', departureAirport: 'FRA', arrivalAirport: 'HEL' },
+      repos, { now: new Date('2025-05-16T10:30:00') },
+    );
+
+    const jal = find(r.lounges, 'Japan Airlines Sakura Lounge');
+    assert.equal(jal.access.status, 'physically_unreachable', 'JAL Sakura non-Schengen — Schengen-lento ei pääse');
+
+    const qr = find(r.lounges, 'Qatar Airways Business Lounge');
+    assert.equal(qr.access.status, 'physically_unreachable');
   });
 
   test('AY Gold 04:00 → JAL Sakura closed', () => {

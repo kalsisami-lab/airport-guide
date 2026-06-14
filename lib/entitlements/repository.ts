@@ -7,8 +7,12 @@ import {
 import { eq, and, inArray } from 'drizzle-orm';
 import type { AllianceTier } from '../normalization/types';
 import type { Condition, LoungeInput } from '../engine/types';
-import type { AirportRepository, LoungeInputWithMeta } from './types';
+import type { AirportInfo, AirportRepository, LoungeInputWithMeta } from './types';
 import type { AirportServiceRuleInput, ServiceType } from '../airport-services/types';
+import { isSchengenCountry } from '../schengen';
+
+// Module-level cache — airport metadata is stable for the lifetime of the server process.
+const airportInfoCache = new Map<string, AirportInfo | null>();
 
 function toDate(s: string | null | undefined): string | null {
   return s ?? null;
@@ -92,6 +96,19 @@ export function createAirportRepository(): AirportRepository {
             description:   e.description ?? null,
           })),
       }));
+    },
+
+    getAirportInfo(iataCode: string): AirportInfo | null {
+      if (airportInfoCache.has(iataCode)) return airportInfoCache.get(iataCode)!;
+      const row = db.select({ countryCode: airports.countryCode })
+        .from(airports)
+        .where(eq(airports.iataCode, iataCode))
+        .get();
+      const info = row
+        ? { countryCode: row.countryCode, isSchengen: isSchengenCountry(row.countryCode) }
+        : null;
+      airportInfoCache.set(iataCode, info);
+      return info;
     },
 
     getAirportServiceRules(iataCode: string, serviceType: ServiceType): AirportServiceRuleInput[] {

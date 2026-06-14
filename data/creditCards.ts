@@ -104,4 +104,13 @@ export const creditCards: CreditCard[] = [
     fastTrack: false,
     guestPolicy: 'Priority Pass + LoungeKey included',
   },
+  {
+    id: 'priority-pass-standalone',
+    name: 'Priority Pass (Membership)',
+    issuer: 'Priority Pass',
+    country: 'Global',
+    loungeAccess: ['priority-pass'],
+    fastTrack: false,
+    guestPolicy: 'Guest allowance depends on membership tier (Standard, Standard Plus, Prestige)',
+  },
 ];

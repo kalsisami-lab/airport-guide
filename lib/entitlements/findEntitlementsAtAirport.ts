@@ -35,7 +35,11 @@ export function findEntitlementsAtAirport(
   const now = opts?.now ?? new Date();
 
   // ── Build contexts ─────────────────────────────────────────────────────────
-  const passenger = buildPassengerContext(flight, repos.airlines);
+  // Single DB lookup for arrival airport — country_code + isSchengen from same row.
+  // Unknown IATA → arrivalCountryCode stays unset → arrivalIsSchengen = null → no zone filter.
+  const arrivalInfo    = repos.airport.getAirportInfo(flight.arrivalAirport);
+  const enrichedFlight = arrivalInfo ? { ...flight, arrivalCountryCode: arrivalInfo.countryCode } : flight;
+  const passenger = buildPassengerContext(enrichedFlight, repos.airlines);
   const status    = buildStatusContext(user.statusCards, passenger.operatingAlliance, repos.tiers);
 
   // ── Evaluate lounges ───────────────────────────────────────────────────────

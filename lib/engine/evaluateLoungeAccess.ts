@@ -206,6 +206,28 @@ export function evaluateLoungeAccess(
     };
   }
 
+  // ── 2b. Schengen zone reachability ────────────────────────────────────────
+  const loungeArea = lounge.area ?? 'all';
+  if (loungeArea === 'schengen' || loungeArea === 'non_schengen') {
+    const destSchengen = passenger.arrivalIsSchengen ?? null;
+    if (destSchengen !== null) {
+      const mismatch =
+        (loungeArea === 'schengen'     && !destSchengen) ||
+        (loungeArea === 'non_schengen' &&  destSchengen);
+      if (mismatch) {
+        return {
+          status:       'physically_unreachable',
+          confidence:   0.9,
+          reason:       loungeArea === 'schengen'
+            ? 'Lounge is in the Schengen zone — not accessible for non-Schengen flights'
+            : 'Lounge is in the non-Schengen zone — not accessible for Schengen flights',
+          guest_allowed: false,
+          source:       'schengen_zone_check',
+        };
+      }
+    }
+  }
+
   // ── 3. DENY first: blackout exceptions (priority DESC) ────────────────────
   const activeExceptions = lounge.exceptions
     .filter((e) => isActive(e.validFrom, e.validTo, now))

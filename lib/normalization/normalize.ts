@@ -8,6 +8,7 @@ import type {
   TierRepository,
   UserStatusCard,
 } from './types';
+import { isSchengenCountry } from '../schengen';
 
 const ALLIANCE_TIER_PREFIX: Record<NonNullable<AllianceCode>, string> = {
   oneworld:      'oneworld_',
@@ -41,6 +42,10 @@ export function buildPassengerContext(
     sameDayDeparture:     flight.sameDayDeparture ?? false,
     departureCountryCode: flight.departureCountryCode ?? '',
     departureTime:        flight.departureTime,
+    arrivalCountryCode:   flight.arrivalCountryCode ?? '',
+    arrivalIsSchengen:    flight.arrivalCountryCode
+      ? isSchengenCountry(flight.arrivalCountryCode)
+      : null,
   };
 }
 

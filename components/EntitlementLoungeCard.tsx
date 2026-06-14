@@ -223,6 +223,15 @@ export default function EntitlementLoungeCard({ entitlement, isBest, passengerTe
               <span className="ml-1 text-amber-400/80">· Terminal {lounge.terminalId}</span>
             )}
           </p>
+          {(lounge.area === 'schengen' || lounge.area === 'non_schengen') && (
+            <span className={`inline-block mt-1.5 text-[10px] font-medium px-2 py-0.5 rounded-full border ${
+              lounge.area === 'schengen'
+                ? 'bg-teal-500/20 text-teal-300 border-teal-500/30'
+                : 'bg-orange-500/20 text-orange-300 border-orange-500/30'
+            }`}>
+              {lounge.area === 'schengen' ? 'Schengen' : 'Non-Schengen'}
+            </span>
+          )}
         </div>
         <span className={`shrink-0 text-xs font-medium px-2.5 py-1 rounded-full ${style.badge}`}>
           {style.label}

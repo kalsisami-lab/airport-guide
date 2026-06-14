@@ -22,6 +22,7 @@ export interface FlightRequest {
   departureTerminalId?: number;   // for physically_unreachable check
   departureTime?: string;         // ISO 8601
   departureCountryCode?: string;
+  arrivalCountryCode?: string;    // injected by findEntitlementsAtAirport from DB
   sameDayDeparture?: boolean;
   gate?: string;                  // departure gate — used for walking-time hints in UI
 }
@@ -63,9 +64,16 @@ export type { AirportServiceRuleInput, ServiceType };
 
 // ─── Repository interface ─────────────────────────────────────────────────────
 
+export interface AirportInfo {
+  countryCode: string;   // ISO 3166-1 alpha-2
+  isSchengen:  boolean;
+}
+
 export interface AirportRepository {
   getLoungesAtAirport(iataCode: string): LoungeInput[];
   getAirportServiceRules(iataCode: string, serviceType: ServiceType): AirportServiceRuleInput[];
+  /** Single DB lookup — countryCode and isSchengen from the same row. Returns null if IATA unknown. */
+  getAirportInfo(iataCode: string): AirportInfo | null;
 }
 
 export interface Repos {
