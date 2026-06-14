@@ -8,7 +8,6 @@ export async function GET() {
   const cwd = process.cwd();
   const info: Record<string, unknown> = {
     cwd,
-    __dirname,
     nodeVersion: process.version,
     platform: process.platform,
   };
