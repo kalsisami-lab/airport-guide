@@ -5,8 +5,16 @@ import path from 'path';
 
 const DB_PATH = path.join(process.cwd(), 'db', 'entitlements.sqlite');
 
-const sqlite = new Database(DB_PATH);
-sqlite.pragma('journal_mode = WAL');
+const isVercel = !!process.env.VERCEL;
+const sqlite = new Database(DB_PATH, {
+  readonly:      isVercel,
+  fileMustExist: true,
+});
+if (!isVercel) {
+  sqlite.pragma('journal_mode = WAL');
+} else {
+  sqlite.pragma('journal_mode = MEMORY');
+}
 sqlite.pragma('foreign_keys = ON');
 
 export const db = drizzle(sqlite, { schema });
