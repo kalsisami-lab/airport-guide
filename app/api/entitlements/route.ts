@@ -1,5 +1,21 @@
 // Experimental entitlement engine — kokeilu-branch only.
 // The original /api/lounges is untouched and remains the production path.
+import { readdirSync, existsSync } from 'fs';
+import path from 'path';
+
+console.log('[DIAG] process.cwd():', process.cwd());
+console.log('[DIAG] __dirname:', __dirname);
+try {
+  console.log('[DIAG] files at cwd:', readdirSync(process.cwd()));
+} catch (e) { console.log('[DIAG] cwd read failed:', e); }
+try {
+  const dbDir = path.join(process.cwd(), 'db');
+  console.log('[DIAG] db dir exists:', existsSync(dbDir));
+  if (existsSync(dbDir)) {
+    console.log('[DIAG] files in db/:', readdirSync(dbDir));
+  }
+} catch (e) { console.log('[DIAG] db dir read failed:', e); }
+
 import { NextRequest, NextResponse } from 'next/server';
 import { findEntitlementsAtAirport } from '@/lib/entitlements/findEntitlementsAtAirport';
 import { createAirlineRepository, createTierRepository } from '@/lib/normalization/repository';
