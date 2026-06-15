@@ -10,6 +10,7 @@ export type { PassengerContext, StatusContext };
 export interface UserInput {
   statusCards: UserStatusCard[];
   cards?: ChannelType[];          // Priority Pass, Amex Centurion, etc.
+  fastTrackCards?: string[];      // provider keys for airport_service_rules.provider
 }
 
 // Extends FlightInput with terminal info needed for reachability checks.

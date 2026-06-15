@@ -41,6 +41,7 @@ function ruleMatches(
   rule: AirportServiceRuleInput,
   passenger: PassengerContext,
   status: StatusContext | null,
+  fastTrackCards: Set<string>,
 ): boolean {
   const evalCtx: EvalCtx = { passenger, status };
 
@@ -57,6 +58,16 @@ function ruleMatches(
     if (passenger.operatingAlliance !== required) return false;
   }
 
+  // Credit card gate: provider is the sole criterion (no tier, carrier, or conditions).
+  // When provider coexists with other criteria it acts as a display label only.
+  const providerIsGate =
+    rule.provider !== null &&
+    rule.provider !== 'paid' &&
+    rule.minAllianceTier === null &&
+    (rule.carrierRestriction === null || rule.carrierRestriction.length === 0) &&
+    rule.conditions === null;
+  if (providerIsGate && !fastTrackCards.has(rule.provider!)) return false;
+
   return true;
 }
 
@@ -66,6 +77,7 @@ export function evaluateAirportService(
   serviceType: ServiceType,
   rules: AirportServiceRuleInput[],
   now: Date,
+  fastTrackCards: Set<string> = new Set(),
 ): AccessResult {
   // 1. not_applicable: priority_boarding with departure already passed
   if (
@@ -93,17 +105,6 @@ export function evaluateAirportService(
     };
   }
 
-  // 3. status.fastTrack gate — only for fast_track_security
-  if (serviceType === 'fast_track_security' && status !== null && status.fastTrack === false) {
-    return {
-      status:        'denied',
-      confidence:    0.95,
-      reason:        'Fast track not included in your status tier',
-      guest_allowed: false,
-      source:        'status_tier',
-    };
-  }
-
   const activeRules = rules.filter((r) => isActive(r.validFrom, r.validTo, now));
 
   // 4. Deny rules evaluated first (priority DESC)
@@ -112,7 +113,7 @@ export function evaluateAirportService(
     .sort((a, b) => b.priority - a.priority);
 
   for (const rule of denyRules) {
-    if (ruleMatches(rule, passenger, status)) {
+    if (ruleMatches(rule, passenger, status, fastTrackCards)) {
       return {
         status:        'denied',
         confidence:    rule.confidence,
@@ -129,7 +130,7 @@ export function evaluateAirportService(
     .sort((a, b) => b.priority - a.priority);
 
   for (const rule of allowRules) {
-    if (ruleMatches(rule, passenger, status)) {
+    if (ruleMatches(rule, passenger, status, fastTrackCards)) {
       if (rule.provider === 'paid') {
         return {
           status:        'paid_available',

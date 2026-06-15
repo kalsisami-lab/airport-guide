@@ -12,6 +12,7 @@ export type CreditCard = {
   country: string;
   loungeAccess: CardLoungeAccess[];
   fastTrack: boolean;
+  fastTrackProviders?: string[];   // provider keys matched against airport_service_rules.provider
   guestPolicy?: string;
   notes?: string;
 };
@@ -24,6 +25,7 @@ export const creditCards: CreditCard[] = [
     country: 'Global',
     loungeAccess: ['priority-pass', 'amex-platinum'],
     fastTrack: true,
+    fastTrackProviders: ['amex_centurion'],
     guestPolicy: 'Up to 2 complimentary guests via Priority Pass Prestige',
   },
   {
@@ -68,7 +70,19 @@ export const creditCards: CreditCard[] = [
     issuer: 'Nordea',
     country: 'Finland',
     loungeAccess: ['lounge-key'],
-    fastTrack: false,
+    fastTrack: true,
+    fastTrackProviders: ['nordea_fast_track'],
+  },
+  {
+    id: 'nordea-black',
+    name: 'Nordea Black',
+    issuer: 'Nordea',
+    country: 'Finland',
+    loungeAccess: ['priority-pass'],
+    fastTrack: true,
+    fastTrackProviders: ['nordea_fast_track'],
+    guestPolicy: 'Priority Pass membership included',
+    notes: 'Fast Track bookable via Mastercard Travel Pass app',
   },
   {
     id: 'seb-platinum',
@@ -85,6 +99,17 @@ export const creditCards: CreditCard[] = [
     country: 'Finland',
     loungeAccess: ['lounge-key'],
     fastTrack: false,
+  },
+  {
+    id: 'aktia-infinite',
+    name: 'Aktia Visa Infinite',
+    issuer: 'Aktia',
+    country: 'Finland',
+    loungeAccess: ['priority-pass'],
+    fastTrack: true,
+    fastTrackProviders: ['aktia_fast_track'],
+    guestPolicy: 'Priority Pass membership included',
+    notes: 'Fast Track bookable via Mastercard Travel Pass app',
   },
   {
     id: 'finnair-visa',

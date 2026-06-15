@@ -80,7 +80,8 @@ export function findEntitlementsAtAirport(
     ]),
   ) as Record<ServiceType, ReturnType<typeof repos.airport.getAirportServiceRules>>;
 
-  const airportServices = findAirportServices(passenger, status, flight.departureAirport, rulesMap, now);
+  const fastTrackCards = new Set<string>(user.fastTrackCards ?? []);
+  const airportServices = findAirportServices(passenger, status, flight.departureAirport, rulesMap, now, fastTrackCards);
 
   // ── Backward-compatible derived fields for the existing UI ─────────────────
   const fastTrack:        FastTrackResult        = toAvailableResult(airportServices.services.fast_track_security);

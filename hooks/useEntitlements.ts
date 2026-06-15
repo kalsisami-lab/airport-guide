@@ -75,6 +75,8 @@ export function useEntitlements(
         }) as ChannelType[])
       : [];
 
+    const fastTrackCards: string[] = q.card?.fastTrackProviders ?? [];
+
     const body = {
       flight: {
         operatingCarrier: q.operatingCarrierCode ?? 'UNKN',
@@ -86,6 +88,7 @@ export function useEntitlements(
       user: {
         statusCards,
         cards: channels,
+        fastTrackCards,
       },
     };
 

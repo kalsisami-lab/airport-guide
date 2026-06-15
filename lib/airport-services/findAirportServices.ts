@@ -10,6 +10,7 @@ export function findAirportServices(
   airportIata: string,
   rulesMap: Record<ServiceType, AirportServiceRuleInput[]>,
   now: Date,
+  fastTrackCards: Set<string> = new Set(),
 ): AirportServicesResult {
   const services = {} as Record<ServiceType, AccessResult>;
 
@@ -20,6 +21,7 @@ export function findAirportServices(
       serviceType,
       rulesMap[serviceType] ?? [],
       now,
+      fastTrackCards,
     );
   }
 

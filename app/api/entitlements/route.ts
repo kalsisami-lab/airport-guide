@@ -38,8 +38,9 @@ interface EntitlementRequest {
     gate?:               string;
   };
   user: {
-    statusCards: { programCode: string; tierName: string }[];
-    cards?:      string[];
+    statusCards:     { programCode: string; tierName: string }[];
+    cards?:          string[];
+    fastTrackCards?: string[];
   };
 }
 
@@ -94,8 +95,9 @@ export async function POST(req: NextRequest) {
   };
 
   const user: UserInput = {
-    statusCards: parsed.user.statusCards,
-    cards:       (parsed.user.cards ?? []) as ChannelType[],
+    statusCards:    parsed.user.statusCards,
+    cards:          (parsed.user.cards ?? []) as ChannelType[],
+    fastTrackCards: parsed.user.fastTrackCards ?? [],
   };
 
   try {

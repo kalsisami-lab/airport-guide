@@ -79,14 +79,14 @@ describe('HEL', () => {
     assert.ok(platWing.access.reason.includes('oneworld_emerald'));
   });
 
-  test('AY Silver (ruby) → fast track denied (alle sapphire-minimi)', () => {
+  test('AY Silver (ruby) + AY flight → fast track allowed (Phase 15: AY-spesifinen ruby-sääntö)', () => {
     const r = findEntitlementsAtAirport(
       { statusCards: [{ programCode: 'ay-plus', tierName: 'Silver' }] },
       { operatingCarrier: 'AY', cabin: 'economy', departureAirport: 'HEL', arrivalAirport: 'FRA' },
       repos, { now: OPEN },
     );
     assert.equal(r.status?.allianceTier, 'oneworld_ruby');
-    assert.equal(r.fastTrack.available, false, 'Ruby ei riitä HEL fast trackiin');
+    assert.equal(r.fastTrack.available, true, 'AY Silver saa HEL Fast Trackin (Phase 15)');
   });
 
   test('AY Platinum + LH Senator, flying LX (star_alliance) → valitaan star_gold', () => {
