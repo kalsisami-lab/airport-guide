@@ -19,11 +19,10 @@ function openDb(): DrizzleDB {
     readonly:      isVercel,
     fileMustExist: true,
   });
-  if (!isVercel) {
-    sqlite.pragma('journal_mode = WAL');
-  } else {
-    sqlite.pragma('journal_mode = MEMORY');
-  }
+  // WAL mode is intentionally avoided: the .sqlite file is committed to git and
+  // deployed to Vercel's read-only /var/task. WAL readers require a .shm file;
+  // if it can't be created, SQLite throws SQLITE_CANTOPEN. DELETE journal mode
+  // (the SQLite default) is self-contained and works on read-only filesystems.
   sqlite.pragma('foreign_keys = ON');
   _db = drizzle(sqlite, { schema });
   return _db;
