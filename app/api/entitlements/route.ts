@@ -7,13 +7,20 @@ import { createAirportRepository } from '@/lib/entitlements/repository';
 import type { FlightRequest, UserInput } from '@/lib/entitlements/types';
 import type { ChannelType } from '@/lib/engine/types';
 
-// Repositories load from SQLite once at module initialisation (process lifetime).
-// better-sqlite3 is synchronous, so this is safe in Node.js.
-const repos = {
-  airlines: createAirlineRepository(),
-  tiers:    createTierRepository(),
-  airport:  createAirportRepository(),
-};
+// Repositories are initialised lazily on the first request (not at module evaluation)
+// so that Next.js's build-time "Collecting page data" phase does not open the DB.
+type Repos = { airlines: ReturnType<typeof createAirlineRepository>; tiers: ReturnType<typeof createTierRepository>; airport: ReturnType<typeof createAirportRepository> };
+let _repos: Repos | null = null;
+function getRepos(): Repos {
+  if (!_repos) {
+    _repos = {
+      airlines: createAirlineRepository(),
+      tiers:    createTierRepository(),
+      airport:  createAirportRepository(),
+    };
+  }
+  return _repos;
+}
 
 // ─── Request schema ───────────────────────────────────────────────────────────
 
@@ -92,7 +99,7 @@ export async function POST(req: NextRequest) {
   };
 
   try {
-    const result = findEntitlementsAtAirport(user, flight, repos);
+    const result = findEntitlementsAtAirport(user, flight, getRepos());
     return NextResponse.json(result);
   } catch (err) {
     console.error('[/api/entitlements]', err);
