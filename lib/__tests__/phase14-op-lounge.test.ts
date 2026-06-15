@@ -1,14 +1,20 @@
 /**
- * Phase 14 (fix): OP Lounge by Aspire (HEL, id=4).
+ * Phase 14 v2: OP Lounge by Aspire (HEL, id=4).
  *
- * Access model after fix:
- *   - op_card channel:         OP Visa Gold / Platinum / Mastercard World Elite
- *   - alliance_status channel: oneworld Sapphire+ flying on oneworld carrier
- *   - paid channel:            walk-in
+ * Access model (after v2 fix):
+ *   - op_card:         OP Visa Gold / Platinum / Mastercard World Elite
+ *   - alliance_status: star_gold (Senator) + carrier_restriction=['LH']
+ *   - paid:            walk-in
  *
- * NOT accepted (channels removed in fix):
- *   - priority_pass, lounge_key, dragon_pass — these apply to Aspire Gate 13/27,
- *     not to the OP-branded lounge. Operator brand ≠ access channels.
+ * NOT accepted:
+ *   - priority_pass / lounge_key / dragon_pass (removed in Phase 14 fix)
+ *   - oneworld_sapphire / all_alliance (removed in v2 — contract-based, not alliance-wide)
+ *   - AY passengers (Finnair has own lounge → not in LH carrier_restriction)
+ *   - LH passengers without Senator status (star_silver or lower → denied)
+ *
+ * Sources:
+ *   - OP Group opening article 1/2025: contract-based per partner airline
+ *   - Secondary source: confirmed Lufthansa as partner
  */
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -25,7 +31,7 @@ import type { AirlineRepository, AllianceCode, TierRepository } from '../normali
 
 const CARRIER_ALLIANCE: Record<string, AllianceCode> = {
   AY: 'oneworld',
-  BA: 'oneworld',
+  LH: 'star_alliance',
   SK: 'star_alliance',
 };
 
@@ -35,7 +41,9 @@ const airlineRepo: AirlineRepository = {
 
 const tierRepo: TierRepository = {
   getTierForCard: (prog, tier) => {
-    if (prog === 'ay-plus' && tier === 'Gold') return { allianceTier: 'oneworld_sapphire', fastTrack: true };
+    if (prog === 'ay-plus'       && tier === 'Gold')            return { allianceTier: 'oneworld_sapphire', fastTrack: true };
+    if (prog === 'lh-miles-more' && tier === 'Senator')         return { allianceTier: 'star_gold',         fastTrack: true };
+    if (prog === 'lh-miles-more' && tier === 'FrequentTraveler') return { allianceTier: 'star_silver',       fastTrack: false };
     return null;
   },
 };
@@ -49,7 +57,7 @@ function makeAirportRepo(lounges: LoungeInputWithMeta[]): AirportRepository {
   };
 }
 
-// ─── OP Lounge by Aspire fixture (mirrors DB state after fix) ─────────────────
+// ─── Lounge fixtures (mirror DB state after v2 fix) ──────────────────────────
 
 function makeOPLounge(): LoungeInputWithMeta {
   return {
@@ -63,31 +71,31 @@ function makeOPLounge(): LoungeInputWithMeta {
     locationDescription: 'Schengen, Level 3 — Pier B, Gate 22',
     amenities:           ['Buffet', 'Bar', 'WiFi', 'TV lounge'],
     channels: [
-      // oneworld Sapphire+ — all_alliance dynamic lookup
-      {
-        id: 50, channelType: 'alliance_status', allianceAccess: 'all_alliance',
-        rules: [{ id: 50, priority: 100, validFrom: '2020-01-01', validTo: null,
-          confidence: 0.9, minAllianceTier: 'oneworld_sapphire',
-          carrierRestriction: null, conditions: null }],
-      },
-      // Walk-in paid
+      // paid — walk-in
       {
         id: 51, channelType: 'paid', allianceAccess: null,
         rules: [{ id: 51, priority: 100, validFrom: '2020-01-01', validTo: null,
           confidence: 0.9, minAllianceTier: null, carrierRestriction: null, conditions: null }],
       },
-      // OP card (bank-branded access — no PP/LK/DP here)
+      // op_card — OP bank cards
       {
         id: 52, channelType: 'op_card', allianceAccess: null,
         rules: [{ id: 52, priority: 100, validFrom: '2020-01-01', validTo: null,
           confidence: 0.9, minAllianceTier: null, carrierRestriction: null, conditions: null }],
+      },
+      // alliance_status — star_gold (Senator), carrier=LH only
+      {
+        id: 53, channelType: 'alliance_status', allianceAccess: 'carrier_specific',
+        rules: [{ id: 53, priority: 100, validFrom: '2020-01-01', validTo: null,
+          confidence: 0.85, minAllianceTier: 'star_gold',
+          carrierRestriction: ['LH'], conditions: null }],
       },
     ],
     exceptions: [],
   };
 }
 
-// Separate Aspire lounge (Gate 27) — has PP, unlike OP Lounge
+// Aspire Gate 27 — has PP channel; used to verify PP still works elsewhere
 function makeAspireGate27(): LoungeInputWithMeta {
   return {
     id:                  26,
@@ -122,8 +130,8 @@ const repos: Repos = {
 };
 
 const NOW    = new Date('2026-06-15T10:00:00');
+const LH_HEL: FlightRequest = { operatingCarrier: 'LH', cabin: 'economy', departureAirport: 'HEL', arrivalAirport: 'FRA' };
 const AY_HEL: FlightRequest = { operatingCarrier: 'AY', cabin: 'economy', departureAirport: 'HEL', arrivalAirport: 'LHR' };
-const SK_HEL: FlightRequest = { operatingCarrier: 'SK', cabin: 'economy', departureAirport: 'HEL', arrivalAirport: 'ARN' };
 
 function getLounge(result: ReturnType<typeof findEntitlementsAtAirport>, name: string) {
   const l = result.lounges.find((l) => l.lounge.name === name);
@@ -131,7 +139,7 @@ function getLounge(result: ReturnType<typeof findEntitlementsAtAirport>, name: s
   return l;
 }
 
-// ─── OP Lounge: op_card access ───────────────────────────────────────────────
+// ─── OP card access ───────────────────────────────────────────────────────────
 
 describe('OP Lounge by Aspire — op_card channel', () => {
 
@@ -140,56 +148,73 @@ describe('OP Lounge by Aspire — op_card channel', () => {
     const result = findEntitlementsAtAirport(user, AY_HEL, repos, { now: NOW });
     const l = getLounge(result, 'OP Lounge by Aspire');
     assert.equal(l.access.status, 'allowed');
-    assert.ok(l.access.source?.startsWith('channel:'), 'source should be channel-based');
+    assert.ok(l.access.source?.startsWith('channel:'));
   });
 
-  test('OP Visa Platinum (PP + op-card) → allowed via op_card at OP Lounge', () => {
+  test('OP Visa Platinum (PP + op-card) → allowed via op_card', () => {
     const user: UserInput = { statusCards: [], cards: ['priority_pass', 'op_card'] };
     const result = findEntitlementsAtAirport(user, AY_HEL, repos, { now: NOW });
     assert.equal(getLounge(result, 'OP Lounge by Aspire').access.status, 'allowed');
   });
 
-  test('OP Mastercard World Elite (LK + op-card) → allowed via op_card at OP Lounge', () => {
+  test('OP Mastercard World Elite (LK + op-card) → allowed via op_card', () => {
     const user: UserInput = { statusCards: [], cards: ['lounge_key', 'op_card'] };
     const result = findEntitlementsAtAirport(user, AY_HEL, repos, { now: NOW });
     assert.equal(getLounge(result, 'OP Lounge by Aspire').access.status, 'allowed');
   });
 });
 
-// ─── OP Lounge: PP no longer grants access ────────────────────────────────────
+// ─── Lufthansa Senator access ─────────────────────────────────────────────────
+
+describe('OP Lounge by Aspire — LH Senator (star_gold)', () => {
+
+  test('LH Senator (star_gold) + LH flight → allowed via alliance_status', () => {
+    const user: UserInput = { statusCards: [{ programCode: 'lh-miles-more', tierName: 'Senator' }], cards: [] };
+    const result = findEntitlementsAtAirport(user, LH_HEL, repos, { now: NOW });
+    assert.equal(getLounge(result, 'OP Lounge by Aspire').access.status, 'allowed');
+  });
+
+  test('LH flight, no status → paid_available (Senator required)', () => {
+    const user: UserInput = { statusCards: [], cards: [] };
+    const result = findEntitlementsAtAirport(user, LH_HEL, repos, { now: NOW });
+    assert.equal(getLounge(result, 'OP Lounge by Aspire').access.status, 'paid_available');
+  });
+
+  test('LH Frequent Traveler (star_silver) + LH flight → paid_available (Senator minimum)', () => {
+    const user: UserInput = { statusCards: [{ programCode: 'lh-miles-more', tierName: 'FrequentTraveler' }], cards: [] };
+    const result = findEntitlementsAtAirport(user, LH_HEL, repos, { now: NOW });
+    assert.equal(getLounge(result, 'OP Lounge by Aspire').access.status, 'paid_available');
+  });
+
+  test('AY Finnair Plus Gold + AY flight → paid_available (AY not in carrier_restriction)', () => {
+    // Finnair has own lounge — not in LH carrier_restriction for OP Lounge
+    const user: UserInput = { statusCards: [{ programCode: 'ay-plus', tierName: 'Gold' }], cards: [] };
+    const result = findEntitlementsAtAirport(user, AY_HEL, repos, { now: NOW });
+    assert.equal(getLounge(result, 'OP Lounge by Aspire').access.status, 'paid_available');
+  });
+});
+
+// ─── PP no longer grants access at OP Lounge ─────────────────────────────────
 
 describe('OP Lounge by Aspire — PP/LK channels removed', () => {
 
   test('Standalone PP card → paid_available at OP Lounge (no PP channel)', () => {
-    // PP doesn't unlock OP Lounge; paid channel still makes it paid_available
     const user: UserInput = { statusCards: [], cards: ['priority_pass'] };
     const result = findEntitlementsAtAirport(user, AY_HEL, repos, { now: NOW });
     assert.equal(getLounge(result, 'OP Lounge by Aspire').access.status, 'paid_available');
   });
 
-  test('PP card → likely_allowed at Aspire Gate 27 (PP channel intact, confidence 0.8)', () => {
+  test('PP card → likely_allowed at Aspire Gate 27 (PP channel intact there)', () => {
     const user: UserInput = { statusCards: [], cards: ['priority_pass'] };
     const result = findEntitlementsAtAirport(user, AY_HEL, repos, { now: NOW });
-    // confidence 0.8 → likely_allowed (threshold is 0.85 for 'allowed')
+    // confidence 0.8 → likely_allowed (threshold 0.85 for 'allowed')
     assert.equal(getLounge(result, 'Aspire Lounge by Gate 27').access.status, 'likely_allowed');
   });
 });
 
-// ─── OP Lounge: oneworld and walk-in ─────────────────────────────────────────
+// ─── Walk-in ──────────────────────────────────────────────────────────────────
 
-describe('OP Lounge by Aspire — alliance_status and paid', () => {
-
-  test('Finnair Plus Gold (oneworld_sapphire) + AY → allowed via alliance_status', () => {
-    const user: UserInput = { statusCards: [{ programCode: 'ay-plus', tierName: 'Gold' }], cards: [] };
-    const result = findEntitlementsAtAirport(user, AY_HEL, repos, { now: NOW });
-    assert.equal(getLounge(result, 'OP Lounge by Aspire').access.status, 'allowed');
-  });
-
-  test('oneworld_sapphire on non-oneworld carrier (SK) → paid_available (carrier mismatch)', () => {
-    const user: UserInput = { statusCards: [{ programCode: 'ay-plus', tierName: 'Gold' }], cards: [] };
-    const result = findEntitlementsAtAirport(user, SK_HEL, repos, { now: NOW });
-    assert.equal(getLounge(result, 'OP Lounge by Aspire').access.status, 'paid_available');
-  });
+describe('OP Lounge by Aspire — paid walk-in', () => {
 
   test('walk-in (no card, no status) → paid_available', () => {
     const user: UserInput = { statusCards: [], cards: [] };

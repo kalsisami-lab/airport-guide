@@ -37,26 +37,82 @@ Run this query and review each lounge. Expected question per row:
 
 ---
 
-## 2. Lesson: operator brand ≠ access channels (Aspire case study)
+## 2. Lessons: Aspire-operated lounges and data sourcing
 
-**Recorded for future data entry:** OP Lounge by Aspire at HEL (id=4) was incorrectly
-seeded in Phase 14 with PP/LK/DP channels, inherited from the assumption that all
-Aspire-operated lounges share the same access. Finavia's source does not list these for
-the OP-branded lounge — it uses bank-card (op_card) access, not the general Aspire/Plaza
-Premium PP/LK/DP network.
+**Learning A — operator brand ≠ access channels:**
+OP Lounge by Aspire at HEL (id=4) was incorrectly seeded in Phase 14 with PP/LK/DP
+channels, inherited from the assumption that all Aspire-operated lounges share the same
+access. The OP-branded lounge uses bank-card (op_card) access, not the general Aspire /
+Plaza Premium PP/LK/DP network.
+
+**Learning B — alliance-wide ≠ contract-based:**
+A second fix (Phase 14 v2) removed an incorrect `oneworld_sapphire / all_alliance` rule.
+OP Lounge access is contract-based per partner airline, not alliance-wide. Confirmed
+partner: Lufthansa (LH, star_gold minimum). AY passengers are excluded because Finnair
+has its own lounge at HEL.
+
+**Learning C — two-source verification:**
+The incorrect oneworld rule was added from a single secondary source. The OP Group
+opening article (1/2025) and a secondary source together clarified the real access model.
+Always cross-reference at least two sources before adding alliance-level rules.
 
 **Rule going forward:** when adding a bank- or airline-branded lounge operated by a third
-party (Aspire, Plaza Premium, etc.), verify access channels per-lounge via Finavia or the
-operator's specific lounge page — do NOT inherit from the operator's other lounges.
+party (Aspire, Plaza Premium, etc.), verify access channels per-lounge. Do NOT inherit
+from the operator's other lounges, and do NOT assume alliance-wide access from a
+single secondary source.
 
 ---
 
-## 3. Seed missing oneworld carriers into the airlines table
+## 3. OP Lounge partner airlines — only LH confirmed
 
-**Risk:** The OP Lounge by Aspire oneworld rule (channel id=50, `alliance_access = 'all_alliance'`)
-grants access based on `passenger.operatingAlliance === 'oneworld'`, which is derived at runtime
-from the `airlines` table join. Currently seeded oneworld members: `AA, AY, BA, IB, JL, QR`.
-Passengers flying on unseeded carriers receive `null` alliance → denied even if entitled.
+**Risk:** OP Lounge serves passengers of partner airlines that have no own lounge at HEL.
+Currently only Lufthansa (LH) is confirmed (channel id=53, `star_gold`, `carrier_restriction=['LH']`).
+Other Star Alliance carriers without HEL lounge may also have contracts, but are NOT verified.
+
+**Possible partners (unconfirmed):** SWISS (LX), Austrian Airlines (OS), KLM (KL), Air France (AF).
+
+**Action needed:** Verify via OP Financial Group press releases, Finavia, or direct carrier
+contact before adding LX/OS/KL/AF to `carrier_restriction` on rule id=53.
+
+---
+
+## 4. LH rule tier — is star_silver sufficient at OP Lounge?
+
+**Risk:** Rule id=53 requires `min_alliance_tier = 'star_gold'` (Senator). The original source
+says "sopimuslentoyhtiöiden tasokorttiasiakkaita" (status card customers of partner airlines)
+without specifying which tier. Conservatively set to star_gold.
+
+**Action needed:** Verify whether Miles & More Frequent Traveler (star_silver) also grants
+access. If yes, lower `min_alliance_tier` on rule id=53 to `'star_silver'`.
+
+---
+
+## 5. Aspire Gate 13 + OP Gold access removed 1/2025
+
+**Status: already correct in DB.** OP Group article (1/2025) states that OP Gold/Platinum
+cardholders can no longer access Aspire Gate 13 (id=25) from January 2025. Confirmed:
+lounge id=25 has no `op_card` channel in the database.
+
+**No action needed.** Documented here for traceability.
+
+---
+
+## 6. Plaza Premium HEL non-Schengen — OP card access unmodelled
+
+**Risk:** OP Group article (1/2025) states that OP Gold/Platinum cardholders can access the
+Plaza Premium lounge in the non-Schengen area as the non-Schengen equivalent of OP Lounge.
+This lounge is not yet in the database (see TODO #7 below re. Plaza Premium HEL).
+
+**Action needed:** Add Plaza Premium HEL non-Schengen lounge with op_card channel once the
+lounge entry itself is confirmed and added.
+
+---
+
+## 7. Seed missing oneworld carriers into the airlines table
+
+**Risk:** Any `all_alliance` rule for oneworld derives access from `passenger.operatingAlliance`,
+which is looked up from the `airlines` table at runtime. Currently seeded oneworld members:
+`AA, AY, BA, IB, JL, QR`. Passengers on unseeded carriers receive `null` alliance → denied.
 
 **Unseeded oneworld members** (absent from `airlines` table as of 2026-06-15):
 CX (Cathay Pacific), MH (Malaysia Airlines), QF (Qantas), RJ (Royal Jordanian),
@@ -67,19 +123,7 @@ No rule change needed — the `all_alliance` mechanism picks them up automatical
 
 ---
 
-## 3. Verify Finnair-only access at OP Lounge — possible sub-Sapphire rule
-
-**Risk:** Finavia's description says "Finnair vain Finnairin lennoilla" (Finnair [passengers]
-only on Finnair flights), which could imply a Finnair-specific rule below the oneworld_sapphire
-tier — e.g., Finnair Plus Silver (oneworld_ruby) on AY flights. Not modelled.
-
-**Action needed:** Confirm via OP or Finavia whether Finnair Plus Silver (or any tier below
-Sapphire) grants access on AY-operated flights. If yes, add a second `alliance_status` rule
-with `min_alliance_tier = 'oneworld_ruby'` and `carrier_restriction = ['AY']`.
-
----
-
-## 4. Star Alliance Gold access at HEL Aspire Lounges
+## 8. Star Alliance Gold access at HEL Aspire Lounges
 
 **Risk:** Aspire Lounge by Gate 13 (id=25) and Gate 27 (id=26) at HEL may grant
 Star Alliance Gold access through Plaza Premium's network agreements. Not verified:
@@ -91,7 +135,7 @@ adding an `alliance_status` channel with `min_alliance_tier = 'star_gold'`.
 
 ---
 
-## 5. HEL Plaza Premium Lounge — not yet added
+## 9. HEL Plaza Premium Lounge — not yet added
 
 **Risk:** Plaza Premium operates a lounge at Helsinki Airport that is distinct from
 the two Aspire Lounge by Plaza Premium entries (Gate 13 and Gate 27). It is not
@@ -103,7 +147,7 @@ via Finavia or Plaza Premium official sources before adding.
 
 ---
 
-## 6. Schengen zone for HEL Aspire Lounges — low-confidence Wikipedia source
+## 10. Schengen zone for HEL Aspire Lounges — low-confidence Wikipedia source
 
 **Risk:** HEL Aspire Lounge by Gate 13 (id=25) and Gate 27 (id=26) are set to
 `area = 'schengen'` at confidence 0.8, based on Wikipedia ("gates 5–36 = Schengen flights").
@@ -114,7 +158,7 @@ or airport map before increasing confidence or relying on zone filtering for the
 
 ---
 
-## 7. Other "by Aspire" and bank lounges in Finland — data gap
+## 11. Other "by Aspire" and bank lounges in Finland — data gap
 
 **Risk:** OP Lounge by Aspire is operated by Plaza Premium / Aspire. Similar branded
 lounges may exist at other Finnish airports (TMP — Tampere-Pirkkala, TKU — Turku) that
@@ -129,7 +173,7 @@ and Danske Bank may offer similar products.
 
 ---
 
-## 8. 718/720 lounge_access_rules without source_url
+## 12. 718/720 lounge_access_rules without source_url
 
 Most rules were seeded without `source_url` or `verified_at`. This is not an immediate
 correctness risk but means rules cannot be re-verified or traced to their origin.
