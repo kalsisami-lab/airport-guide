@@ -36,6 +36,15 @@ export const creditCards: CreditCard[] = [
     guestPolicy: 'Up to 10 complimentary Priority Pass visits/year',
   },
   {
+    id: 'op-visa-gold',
+    name: 'OP Visa Gold',
+    issuer: 'OP Financial Group',
+    country: 'Finland',
+    loungeAccess: ['op-card'],
+    fastTrack: false,
+    guestPolicy: 'Access to OP Lounge by Aspire at Helsinki Airport',
+  },
+  {
     id: 'op-visa-platinum',
     name: 'OP Visa Platinum',
     issuer: 'OP Financial Group',

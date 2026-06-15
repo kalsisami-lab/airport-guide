@@ -37,7 +37,21 @@ Run this query and review each lounge. Expected question per row:
 
 ---
 
-## 2. Seed missing oneworld carriers into the airlines table
+## 2. Lesson: operator brand ≠ access channels (Aspire case study)
+
+**Recorded for future data entry:** OP Lounge by Aspire at HEL (id=4) was incorrectly
+seeded in Phase 14 with PP/LK/DP channels, inherited from the assumption that all
+Aspire-operated lounges share the same access. Finavia's source does not list these for
+the OP-branded lounge — it uses bank-card (op_card) access, not the general Aspire/Plaza
+Premium PP/LK/DP network.
+
+**Rule going forward:** when adding a bank- or airline-branded lounge operated by a third
+party (Aspire, Plaza Premium, etc.), verify access channels per-lounge via Finavia or the
+operator's specific lounge page — do NOT inherit from the operator's other lounges.
+
+---
+
+## 3. Seed missing oneworld carriers into the airlines table
 
 **Risk:** The OP Lounge by Aspire oneworld rule (channel id=50, `alliance_access = 'all_alliance'`)
 grants access based on `passenger.operatingAlliance === 'oneworld'`, which is derived at runtime

@@ -24,12 +24,12 @@ const STATUS_TO_DB: Record<string, { programCode: string; tierName: string }> = 
 };
 
 // Maps CreditCard loungeAccess values → ChannelType used by the new engine.
-// 'op-card' is omitted intentionally — OP cards also carry priority_pass or lounge_key.
 const CARD_TO_CHANNEL: Partial<Record<string, ChannelType>> = {
   'priority-pass': 'priority_pass',
   'lounge-key':    'lounge_key',
   'dragon-pass':   'dragon_pass',
   'amex-platinum': 'amex_centurion',
+  'op-card':       'op_card',
 };
 
 export interface EntitlementsQuery {

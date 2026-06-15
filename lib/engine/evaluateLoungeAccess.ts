@@ -33,6 +33,7 @@ const CHANNEL_LABEL: Partial<Record<string, string>> = {
   lounge_key:     'LoungeKey',
   dragon_pass:    'DragonPass',
   amex_centurion: 'Amex Platinum',
+  op_card:        'OP Card',
   invitation:     'Invitation',
 };
 
@@ -155,6 +156,7 @@ function evaluateChannelRule(
     case 'lounge_key':
     case 'dragon_pass':
     case 'amex_centurion':
+    case 'op_card':
     case 'invitation': {
       if (!passengerCards.has(channel.channelType)) return null;
       return {

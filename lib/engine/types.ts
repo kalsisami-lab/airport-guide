@@ -19,6 +19,7 @@ export type ChannelType =
   | 'lounge_key'
   | 'dragon_pass'
   | 'amex_centurion'
+  | 'op_card'
   | 'paid'
   | 'invitation';
 
