@@ -37,20 +37,35 @@ Run this query and review each lounge. Expected question per row:
 
 ---
 
-## 2. HEL "Helsinki Airport Lounge" (id=4) — unknown provenance
+## 2. Seed missing oneworld carriers into the airlines table
 
-**Risk:** This lounge has no `source_url`, no `verified_at`, and its name/location
-overlap ambiguously with the Aspire Lounge by Gate 27 (Schengen, Pier B area).
-It currently has Priority Pass, LoungeKey, and DragonPass channels at confidence 0.99,
-which may overstate certainty.
+**Risk:** The OP Lounge by Aspire oneworld rule (channel id=50, `alliance_access = 'all_alliance'`)
+grants access based on `passenger.operatingAlliance === 'oneworld'`, which is derived at runtime
+from the `airlines` table join. Currently seeded oneworld members: `AA, AY, BA, IB, JL, QR`.
+Passengers flying on unseeded carriers receive `null` alliance → denied even if entitled.
 
-**Action needed:** On-site or operator verification before renaming, merging, or deleting.
-Check whether this is a legacy entry for the Plaza Premium / Aspire operation,
-or a distinct airside lounge.
+**Unseeded oneworld members** (absent from `airlines` table as of 2026-06-15):
+CX (Cathay Pacific), MH (Malaysia Airlines), QF (Qantas), RJ (Royal Jordanian),
+AT (Royal Air Maroc), UL (SriLankan Airlines), WY (Oman Air).
+
+**Action needed:** Seed missing carriers into `airlines` with `alliance_id = 1` (oneworld).
+No rule change needed — the `all_alliance` mechanism picks them up automatically.
 
 ---
 
-## 3. Star Alliance Gold access at HEL Aspire Lounges
+## 3. Verify Finnair-only access at OP Lounge — possible sub-Sapphire rule
+
+**Risk:** Finavia's description says "Finnair vain Finnairin lennoilla" (Finnair [passengers]
+only on Finnair flights), which could imply a Finnair-specific rule below the oneworld_sapphire
+tier — e.g., Finnair Plus Silver (oneworld_ruby) on AY flights. Not modelled.
+
+**Action needed:** Confirm via OP or Finavia whether Finnair Plus Silver (or any tier below
+Sapphire) grants access on AY-operated flights. If yes, add a second `alliance_status` rule
+with `min_alliance_tier = 'oneworld_ruby'` and `carrier_restriction = ['AY']`.
+
+---
+
+## 4. Star Alliance Gold access at HEL Aspire Lounges
 
 **Risk:** Aspire Lounge by Gate 13 (id=25) and Gate 27 (id=26) at HEL may grant
 Star Alliance Gold access through Plaza Premium's network agreements. Not verified:
@@ -62,7 +77,7 @@ adding an `alliance_status` channel with `min_alliance_tier = 'star_gold'`.
 
 ---
 
-## 4. HEL Plaza Premium Lounge — not yet added
+## 5. HEL Plaza Premium Lounge — not yet added
 
 **Risk:** Plaza Premium operates a lounge at Helsinki Airport that is distinct from
 the two Aspire Lounge by Plaza Premium entries (Gate 13 and Gate 27). It is not
@@ -74,7 +89,7 @@ via Finavia or Plaza Premium official sources before adding.
 
 ---
 
-## 5. Schengen zone for HEL Aspire Lounges — low-confidence Wikipedia source
+## 6. Schengen zone for HEL Aspire Lounges — low-confidence Wikipedia source
 
 **Risk:** HEL Aspire Lounge by Gate 13 (id=25) and Gate 27 (id=26) are set to
 `area = 'schengen'` at confidence 0.8, based on Wikipedia ("gates 5–36 = Schengen flights").
@@ -85,7 +100,22 @@ or airport map before increasing confidence or relying on zone filtering for the
 
 ---
 
-## 6. 718/720 lounge_access_rules without source_url
+## 7. Other "by Aspire" and bank lounges in Finland — data gap
+
+**Risk:** OP Lounge by Aspire is operated by Plaza Premium / Aspire. Similar branded
+lounges may exist at other Finnish airports (TMP — Tampere-Pirkkala, TKU — Turku) that
+are not yet in the database. Additionally, other Finnish banks offer lounge benefits
+(Nordea Platinum is in `data/creditCards.ts` but has no corresponding lounge rule),
+and Danske Bank may offer similar products.
+
+**Action needed:** Verify via Finavia regional airport pages and bank card benefit pages:
+- TMP / TKU: any Aspire-branded or Plaza Premium lounges?
+- Nordea Platinum Mastercard: which lounges does it access at HEL?
+- Danske Bank premium cards: any Finnish lounge access?
+
+---
+
+## 8. 718/720 lounge_access_rules without source_url
 
 Most rules were seeded without `source_url` or `verified_at`. This is not an immediate
 correctness risk but means rules cannot be re-verified or traced to their origin.
