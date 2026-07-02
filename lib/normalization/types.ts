@@ -20,6 +20,9 @@ export interface FlightInput {
   departureCountryCode?: string;  // ISO 3166-1 alpha-2
   arrivalCountryCode?: string;    // ISO 3166-1 alpha-2 — used for Schengen zone routing
   sameDayDeparture?: boolean;
+  // UI-provided fallback when the arrival IATA is unknown. Ignored if
+  // arrivalCountryCode resolves to a real country. See engine precedence rule.
+  passengerZone?: 'schengen' | 'non_schengen';
 }
 
 export interface UserStatusCard {
@@ -39,6 +42,9 @@ export interface PassengerContext {
   departureTime?: string;         // ISO 8601 — used for not_applicable checks
   arrivalCountryCode?: string;    // ISO 3166-1 alpha-2
   arrivalIsSchengen?: boolean | null;  // null = destination country unknown → skip zone check
+  // UI hint used only when arrivalIsSchengen is null (unknown destination).
+  // arrivalIsSchengen (destination-derived) takes precedence when non-null.
+  passengerZone?: 'schengen' | 'non_schengen' | null;
 }
 
 export interface StatusContext {

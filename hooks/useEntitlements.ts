@@ -40,6 +40,9 @@ export interface EntitlementsQuery {
   status:               AirlineStatus | null;
   gate?:                string;
   cabin?:               'economy' | 'business' | 'first';
+  // UI zone selection. Passed through to engine as fallback when arrivalIata is
+  // absent or unresolvable. Omit when the user hasn't specified a zone.
+  passengerZone?:       'schengen' | 'non_schengen';
 }
 
 export type EntitlementsState =
@@ -84,6 +87,7 @@ export function useEntitlements(
         departureAirport: q.airportIata,
         arrivalAirport:   q.arrivalIata ?? 'UNKN',
         gate:             q.gate,
+        passengerZone:    q.passengerZone,
       },
       user: {
         statusCards,
@@ -118,6 +122,7 @@ export function useEntitlements(
       query.arrivalIata          ?? '',
       query.gate                 ?? '',
       query.cabin                ?? '',
+      query.passengerZone        ?? '',
     ].join('|');
 
     if (key === lastKeyRef.current) return;
@@ -134,6 +139,7 @@ export function useEntitlements(
     query.arrivalIata,
     query.gate,
     query.cabin,
+    query.passengerZone,
   ]);
 
   return { ...state, refetch: () => doFetch(query) };

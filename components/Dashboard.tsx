@@ -268,6 +268,11 @@ export default function Dashboard() {
     status,
     gate:  gateInput || undefined,
     cabin,
+    // Fallback zone hint used by the engine only when arrival IATA lookup fails.
+    passengerZone:
+      area === 'schengen'     ? 'schengen'
+      : area === 'non-schengen' ? 'non_schengen'
+      : undefined,
   });
 
   const entitlements = entState.phase === 'done' ? entState.data : null;

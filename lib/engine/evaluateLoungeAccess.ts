@@ -209,20 +209,30 @@ export function evaluateLoungeAccess(
   }
 
   // ── 2b. Schengen zone reachability ────────────────────────────────────────
+  // Precedence: arrivalIsSchengen (destination IATA lookup, ground truth) wins.
+  // passengerZone (UI hint) is a fallback used only when arrival lookup failed.
   const loungeArea = lounge.area ?? 'all';
   if (loungeArea === 'schengen' || loungeArea === 'non_schengen') {
-    const destSchengen = passenger.arrivalIsSchengen ?? null;
+    let destSchengen: boolean | null = passenger.arrivalIsSchengen ?? null;
+    let zoneSource: 'flight' | 'hint' = 'flight';
+    if (destSchengen === null && passenger.passengerZone) {
+      destSchengen = passenger.passengerZone === 'schengen';
+      zoneSource = 'hint';
+    }
     if (destSchengen !== null) {
       const mismatch =
         (loungeArea === 'schengen'     && !destSchengen) ||
         (loungeArea === 'non_schengen' &&  destSchengen);
       if (mismatch) {
+        const zoneLabel = loungeArea === 'schengen' ? 'Schengen' : 'non-Schengen';
+        const otherLabel = loungeArea === 'schengen' ? 'non-Schengen' : 'Schengen';
+        const reason = zoneSource === 'flight'
+          ? `Lounge is in the ${zoneLabel} zone — not reachable on your ${otherLabel} flight`
+          : `Lounge is in the ${zoneLabel} zone — not reachable from the ${otherLabel} area you selected`;
         return {
           status:       'physically_unreachable',
           confidence:   0.9,
-          reason:       loungeArea === 'schengen'
-            ? 'Lounge is in the Schengen zone — not accessible for non-Schengen flights'
-            : 'Lounge is in the non-Schengen zone — not accessible for Schengen flights',
+          reason,
           guest_allowed: false,
           source:       'schengen_zone_check',
         };

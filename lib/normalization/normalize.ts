@@ -46,6 +46,7 @@ export function buildPassengerContext(
     arrivalIsSchengen:    flight.arrivalCountryCode
       ? isSchengenCountry(flight.arrivalCountryCode)
       : null,
+    passengerZone:        flight.passengerZone ?? null,
   };
 }
 

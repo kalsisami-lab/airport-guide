@@ -36,7 +36,8 @@ export function findEntitlementsAtAirport(
 
   // ── Build contexts ─────────────────────────────────────────────────────────
   // Single DB lookup for arrival airport — country_code + isSchengen from same row.
-  // Unknown IATA → arrivalCountryCode stays unset → arrivalIsSchengen = null → no zone filter.
+  // Unknown IATA → arrivalCountryCode stays unset → passengerZone (UI hint) becomes
+  // the only Schengen signal. See engine precedence rule.
   const arrivalInfo    = repos.airport.getAirportInfo(flight.arrivalAirport);
   const enrichedFlight = arrivalInfo ? { ...flight, arrivalCountryCode: arrivalInfo.countryCode } : flight;
   const passenger = buildPassengerContext(enrichedFlight, repos.airlines);

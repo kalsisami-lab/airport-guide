@@ -36,6 +36,7 @@ interface EntitlementRequest {
     departureCountryCode?: string;
     sameDayDeparture?:   boolean;
     gate?:               string;
+    passengerZone?:      'schengen' | 'non_schengen';
   };
   user: {
     statusCards:     { programCode: string; tierName: string }[];
@@ -56,6 +57,7 @@ function validateRequest(body: unknown): EntitlementRequest | null {
   if (typeof f.departureAirport !== 'string') return null;
   if (typeof f.arrivalAirport   !== 'string') return null;
   if (!['first', 'business', 'economy'].includes(f.cabin as string)) return null;
+  if (f.passengerZone !== undefined && !['schengen', 'non_schengen'].includes(f.passengerZone as string)) return null;
 
   const u = b.user as Record<string, unknown>;
   if (!Array.isArray(u.statusCards)) return null;
@@ -92,6 +94,7 @@ export async function POST(req: NextRequest) {
     departureCountryCode: parsed.flight.departureCountryCode?.toUpperCase(),
     sameDayDeparture:     parsed.flight.sameDayDeparture,
     gate:                 parsed.flight.gate,
+    passengerZone:        parsed.flight.passengerZone,
   };
 
   const user: UserInput = {

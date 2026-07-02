@@ -26,6 +26,9 @@ export interface FlightRequest {
   arrivalCountryCode?: string;    // injected by findEntitlementsAtAirport from DB
   sameDayDeparture?: boolean;
   gate?: string;                  // departure gate — used for walking-time hints in UI
+  // UI-provided zone hint. Only used when arrivalCountryCode cannot be resolved
+  // (unknown IATA). See lib/engine/evaluateLoungeAccess.ts for precedence.
+  passengerZone?: 'schengen' | 'non_schengen';
 }
 
 // ─── Fast track ───────────────────────────────────────────────────────────────
