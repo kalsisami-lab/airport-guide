@@ -355,7 +355,7 @@ export default function Dashboard() {
     }
   }, [historicalGate, gateManuallySet]);
 
-  const hasInput        = !!(card || status || flightNumber);
+  const hasInput        = !!(card || status || flightNumber || manualArea !== 'both');
   const isLoading       = flightState.status === 'loading';
   const isGlobalLoading = globalState.status === 'loading';
 
