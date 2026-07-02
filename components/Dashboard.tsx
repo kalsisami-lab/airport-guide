@@ -259,6 +259,27 @@ export default function Dashboard() {
   const departureZone: 'schengen' | 'non-schengen' | 'international' =
     area === 'both' ? 'international' : area;
 
+  // Destination Area UX mode — drives both the render (chip vs dropdown) and passengerZone.
+  //   no-split : departure airport has no Schengen split (HKG/JFK/DXB…) → chip, no zone hint sent
+  //   auto     : Schengen airport + destination known (flight or manual pick) → chip, zone from destination
+  //   manual   : Schengen airport + no destination → active dropdown, zone from manualArea
+  type ZoneUxMode =
+    | { kind: 'no-split' }
+    | { kind: 'auto'; zone: 'schengen' | 'non_schengen'; sourceLabel: string }
+    | { kind: 'manual' };
+
+  const zoneUxMode: ZoneUxMode = useMemo(() => {
+    if (airport && !airport.inSchengen) return { kind: 'no-split' };
+    if (resolvedDest) {
+      const zone: 'schengen' | 'non_schengen' = resolvedDest.schengen ? 'schengen' : 'non_schengen';
+      const sourceLabel = rawFlight
+        ? `detected from ${flightNumber || `${rawFlight.origin.iata}→${rawFlight.destination.iata}`}`
+        : `from selected destination ${resolvedDest.iata}`;
+      return { kind: 'auto', zone, sourceLabel };
+    }
+    return { kind: 'manual' };
+  }, [airport, resolvedDest, rawFlight, flightNumber]);
+
   // Entitlement engine — fires whenever airport, credentials, carrier, or destination change
   const entState = useEntitlements({
     airportIata,
@@ -269,9 +290,11 @@ export default function Dashboard() {
     gate:  gateInput || undefined,
     cabin,
     // Fallback zone hint used by the engine only when arrival IATA lookup fails.
+    // Never sent in 'no-split' mode (lounges there are area='international', no zone check).
     passengerZone:
-      area === 'schengen'     ? 'schengen'
-      : area === 'non-schengen' ? 'non_schengen'
+      zoneUxMode.kind === 'auto'   ? zoneUxMode.zone
+      : zoneUxMode.kind === 'manual' && manualArea === 'schengen'     ? 'schengen'
+      : zoneUxMode.kind === 'manual' && manualArea === 'non-schengen' ? 'non_schengen'
       : undefined,
   });
 
@@ -355,7 +378,6 @@ export default function Dashboard() {
   const localNotFound   = flightState.status === 'not-found' || flightState.status === 'error';
   const showSearchBtn   = localNotFound && flightNumber.trim().length >= 3 && globalState.status === 'idle';
   const showManualDest  = localNotFound && globalState.status !== 'found';
-  const showManualArea  = flightNumber.trim().length < 3;
 
   return (
     <div className="min-h-screen bg-slate-950 text-white">
@@ -579,8 +601,46 @@ export default function Dashboard() {
               />
             )}
 
-            {/* Manual area — only when no flight number entered */}
-            {showManualArea && (
+            {/* Destination Area — context-aware: static chip when detected, dropdown when manual */}
+            {zoneUxMode.kind === 'no-split' && (
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-widest text-slate-400 mb-2">
+                  <span className="mr-1">🌍</span>Destination Area
+                </label>
+                <div className="rounded-xl px-4 py-3 border border-purple-500/20 bg-purple-500/10 flex items-center gap-3">
+                  <span className="text-lg" aria-hidden>📍</span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-purple-300">Non-Schengen</p>
+                    <p className="text-xs text-slate-400">This airport has no Schengen split</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {zoneUxMode.kind === 'auto' && (
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-widest text-slate-400 mb-2">
+                  <span className="mr-1">🌍</span>Destination Area
+                </label>
+                <div className={`rounded-xl px-4 py-3 border flex items-center gap-3 ${
+                  zoneUxMode.zone === 'schengen'
+                    ? 'border-teal-500/20 bg-teal-500/10'
+                    : 'border-purple-500/20 bg-purple-500/10'
+                }`}>
+                  <span className="text-lg" aria-hidden>✈️</span>
+                  <div className="min-w-0 flex-1">
+                    <p className={`text-sm font-semibold ${
+                      zoneUxMode.zone === 'schengen' ? 'text-teal-300' : 'text-purple-300'
+                    }`}>
+                      {zoneUxMode.zone === 'schengen' ? 'Schengen' : 'Non-Schengen'}
+                    </p>
+                    <p className="text-xs text-slate-400">{zoneUxMode.sourceLabel}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {zoneUxMode.kind === 'manual' && (
               <SelectInput
                 label="Destination Area"
                 placeholder="Show all lounges"
