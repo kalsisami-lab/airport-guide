@@ -113,16 +113,28 @@ describe('HEL', () => {
 // ─── FRA ─────────────────────────────────────────────────────────────────────
 
 describe('FRA', () => {
-  test('LH Senator + LX economy → molemmat Senator-loungit allowed, LH First denied (cabin=first vaaditaan), fast track available', () => {
+  test('LH Senator + LX economy FRA→JFK → non-Schengen Senator allowed, Schengen Senator physically_unreachable, LH First denied (cabin=first), fast track available', () => {
+    // Phase 20 update: arrival changed FRA→ZRH → FRA→JFK. ZRH is now seeded (CH
+    // → Schengen), so the original ZRH arrival made this a Schengen flight and
+    // the non-Schengen Senator lounge became correctly zone-blocked — which then
+    // short-circuited the LH FCL cabin=first check (Phase 13's actual target).
+    // Using JFK (non-Schengen) keeps both non-Schengen lounges reachable and
+    // preserves the Phase 13 cabin=first regression check on LH FCL.
+    // (Pre-Phase-20, ZRH was not in the airports table → arrivalIsSchengen fell
+    // through to null → engine bypassed the zone check → both Senators appeared
+    // allowed. Same latent bug class as Phase 17.)
     const r = findEntitlementsAtAirport(
       { statusCards: [{ programCode: 'lh-miles-more', tierName: 'Senator' }] },
-      { operatingCarrier: 'LX', cabin: 'economy', departureAirport: 'FRA', arrivalAirport: 'ZRH' },
+      { operatingCarrier: 'LX', cabin: 'economy', departureAirport: 'FRA', arrivalAirport: 'JFK' },
       repos, { now: OPEN },
     );
 
     const senators = r.lounges.filter((l) => l.lounge.name === 'Lufthansa Senator Lounge');
     assert.equal(senators.length, 2, 'SC + non-SC Senator Lounge');
-    senators.forEach((l) => assert.equal(l.access.status, 'allowed'));
+    const senatorSC  = senators.find((l) => l.lounge.area === 'schengen')!;
+    const senatorNSC = senators.find((l) => l.lounge.area === 'non_schengen')!;
+    assert.equal(senatorNSC.access.status, 'allowed',                'non-Schengen Senator reachable on FRA→JFK');
+    assert.equal(senatorSC.access.status,  'physically_unreachable', 'Schengen Senator blocked on non-Schengen flight');
 
     // Phase 13 fix: FCL requires cabin=first — Senator economy no longer grants access
     const lhFirst = find(r.lounges, 'Lufthansa First Class Lounge');
