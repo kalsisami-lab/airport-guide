@@ -99,12 +99,8 @@ lounge id=25 has no `op_card` channel in the database.
 
 ## 6. Plaza Premium HEL non-Schengen — OP card access unmodelled
 
-**Risk:** OP Group article (1/2025) states that OP Gold/Platinum cardholders can access the
-Plaza Premium lounge in the non-Schengen area as the non-Schengen equivalent of OP Lounge.
-This lounge is not yet in the database (see TODO #7 below re. Plaza Premium HEL).
-
-**Action needed:** Add Plaza Premium HEL non-Schengen lounge with op_card channel once the
-lounge entry itself is confirmed and added.
+**Status: RESOLVED (Phase 16).** Plaza Premium Lounge added at HEL (id=27, non_schengen)
+with `op_card` channel (conf 0.9). See `db/patch-hel-plaza-premium.ts`.
 
 ---
 
@@ -137,13 +133,10 @@ adding an `alliance_status` channel with `min_alliance_tier = 'star_gold'`.
 
 ## 9. HEL Plaza Premium Lounge — not yet added
 
-**Risk:** Plaza Premium operates a lounge at Helsinki Airport that is distinct from
-the two Aspire Lounge by Plaza Premium entries (Gate 13 and Gate 27). It is not
-currently in the database.
-
-**Action needed:** Confirm location, opening hours, access channels
-(Priority Pass, LoungeKey, DragonPass, paid), and area (schengen/non_schengen)
-via Finavia or Plaza Premium official sources before adding.
+**Status: RESOLVED (Phase 16).** Added as lounge id=27 with 5 access channels
+(priority_pass, lounge_key, dragon_pass, op_card, paid), all confidence 0.9.
+Sources: Finavia + Plaza Premium official brochure. See §13, §14, §15 below
+for remaining follow-ups.
 
 ---
 
@@ -184,3 +177,68 @@ correctness risk but means rules cannot be re-verified or traced to their origin
    (i.e., emerald, star_gold, elite_plus) — wrong data here has the highest impact
 
 No bulk fix recommended — source verification requires per-rule human review.
+
+---
+
+## 13. Plaza Premium HEL opening hours — source conflict
+
+**Risk:** Finavia lists Plaza Premium HEL hours as 06:00–00:00, while an earlier Plaza
+Premium source listed 10:00–23:59. The DB currently stores Finavia's 06:00–00:00.
+
+**Action needed:** Verify on-site or via Plaza Premium directly before relying on early-
+morning availability (05:30 arrivals for the first Asian outbound wave).
+
+---
+
+## 14. Plaza Premium HEL PP/LK/DP channels — inferred from network membership
+
+**Risk:** The `priority_pass`, `lounge_key`, and `dragon_pass` channels on Plaza Premium
+HEL (id=27) are set from Plaza Premium's network membership (PP owns DragonPass; LK is
+the parallel Mastercard network). The Plaza Premium brochure confirms access but the
+patch source URL is generic, not a per-app lounge listing.
+
+**Action needed:** Cross-check by looking up "Helsinki Airport" in the Priority Pass app,
+LoungeKey lounge finder, and DragonPass app. Update `source_url` on rules 54/55/56
+with the exact per-app deep link once verified.
+
+---
+
+## 15. schema.ts channel_type enum drift from DB
+
+**Risk:** `db/schema.ts` declares `channel_type` enum as
+`['alliance_status','airline_own','priority_pass','lounge_key','dragon_pass','amex_centurion','paid','invitation']`
+but the DB now contains `op_card` (rule id=52 on OP Lounge, rule id=57 on Plaza Premium).
+SQLite ignores CHECK enums, so this works at runtime, but Drizzle's TypeScript types
+reject `op_card` — which is why `patch-hel-op-lounge-fix.ts`, `patch-hel-op-lounge-rules-v2.ts`,
+and `patch-hel-plaza-premium.ts` all use raw `better-sqlite3` instead of the ORM.
+
+**Action needed:** Add `'op_card'` (and any other DB-only values discovered later) to the
+enum in `db/schema.ts`. Growing debt — each new bank-branded channel widens the gap.
+
+---
+
+## 16. Confidence field carries two meanings — document or split
+
+**Risk:** `lounge_access_rules.confidence` is used by
+`lib/engine/evaluateLoungeAccess.ts:confidenceToStatus` to bucket results:
+`>= 0.85 → allowed`, `0.60–0.84 → likely_allowed`, `< 0.60 → not_enough_info`.
+
+This overloads a single field with two questions that can conflict:
+  (a) "How confident are we that a passenger who matches this rule actually gets in?"
+      (real-world access reliability — e.g. fringe cases where gate agents deny valid PP holders)
+  (b) "How confident are we that this rule is correctly transcribed?"
+      (data-quality metadata — e.g. inferred from a blog vs verified against Finavia)
+
+A rule with strong data provenance but real access variability (e.g. contract lounge that
+sometimes turns away crowded PP holders) currently shares the same slider as a rule with
+uncertain provenance. There is no way to express "we're sure it's coded correctly but the
+real-world outcome is unreliable" — or vice versa.
+
+**Action needed:** Either
+  (a) document the current convention explicitly in `lib/engine/evaluateLoungeAccess.ts`
+      (a header block near `confidenceToStatus`), OR
+  (b) split into two fields: `accessConfidence` (drives status bucket) and
+      `sourceConfidence` (metadata only). Migration cost is real — 720 existing rules.
+
+Recommendation: start with (a). Escalate to (b) if we hit a case where the two meanings
+genuinely diverge and mislead a user.
