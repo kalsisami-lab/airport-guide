@@ -22,7 +22,7 @@ closed), `confidence` (0..1), and human-readable `reason`.
 ## Tech stack
 - **Language:** TypeScript (strict mode)
 - **Framework:** Next.js 15, App Router, React — no Pages Router
-- **Database:** SQLite via `better-sqlite3` (`db/entitlements.sqlite`) — 1 159 airports, 720 lounge rules, 21 alliance rule templates
+- **Database:** SQLite via `better-sqlite3` (`db/entitlements.sqlite`) — currently 5 airports (HEL, FRA, LHR, JFK, DXB), 27 lounges, 54 lounge access rules, 16 airport service rules (PoC seed; full seed planned but not run)
 - **ORM:** Drizzle ORM (`db/schema.ts`, `db/client.ts`)
 - **Test framework:** `node --test` (built-in) — 95-case corpus in `lib/entitlements/__tests__/` + `lib/normalization/__tests__/`
 - **Build / dev:** Turbopack (`npm run dev`), standard Next.js production build (`npm run build`)
@@ -42,8 +42,15 @@ npm run compare-engines  # Diff old vs new engine on 95-case corpus
 
 ### Rule database (`db/`)
 SQLite via Drizzle ORM. Schema in `db/schema.ts`. Seed scripts in `scripts/`.
-- `db/entitlements.sqlite` — 1 159 airports, 720 lounge rules, 21 alliance rule templates
+- `db/entitlements.sqlite` — current PoC seed:
+  - 5 airports: HEL (8 lounges), FRA (7), LHR (5), JFK (4), DXB (3)
+  - 27 lounges, 54 lounge access rules, 16 airport service rules
+  - 3 alliances, 17 airlines, 15 FFPs, 43 status tiers, 54 access channels, 0 exception rules
 - Rules: alliances → airlines → FFPs → status tiers; lounges → access channels → rules
+- **Full seed not yet run.** Raw source data in `sami/`:
+  - `sami/airports.csv` (OurAirports masterdata, 85 391 rows) — ~1 141 large + scheduled-service airports available for seeding
+  - `sami/ALL.csv` — 2 853 lounge seed rows (IATA + terminal + lounge name; no access rules)
+  - `sami/lounge.csv` + `sami/airport.csv` — Skytrax review datasets; not structural masterdata
 
 ### New entitlement engine (`lib/entitlements/`, `lib/engine/`, `lib/airport-services/`, `lib/normalization/`)
 The production path for all lounge and airport-service decisions.
