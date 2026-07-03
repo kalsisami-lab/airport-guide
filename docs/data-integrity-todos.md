@@ -356,3 +356,64 @@ column or an amenity-style hint in `LoungeInputWithMeta` if the UI needs to
 show the discount amount.
 
 Source: https://www.finnair.com/en/smooth-travelling-at-helsinki-airport/finnair-lounges-at-helsinki-airport
+
+---
+
+## 22. carrier_specific-hylkäys palauttaa geneerisen denied/paid-viestin
+
+**Risk:** When an `alliance_status` + `carrier_specific` rule fails because the
+passenger's operating carrier is not in the rule's `carrier_restriction`, the
+engine returns null → falls through to `denied` or `paid_available`. The user
+does not learn *which* carriers the lounge serves — just that they don't have
+access.
+
+Example: at ARN Pearl Lounge C37, an AY passenger with oneworld Sapphire
+status gets `paid_available` (walk-in) with no explanation that the lounge's
+alliance access is scoped to BA/QR only.
+
+**Action needed:** UX enhancement — add a `carrierMismatch` fallback signal
+mirroring Phase 21's `allianceMismatch`. Track the union of carrier
+restrictions across `alliance_status carrier_specific` rules that would have
+matched except for the carrier check. Emit a status/reason like:
+"This lounge serves BA and QR flights only." (`not_applicable` or a new
+sub-status of denied.)
+
+Not urgent — issue recurs at any oneworld hub with carrier-restricted lounges
+(HEL Finnair Lounge post-§17 was reduced to all_alliance, but ARN Pearl T2 and
+C37 both use carrier_specific; will also apply to future FRA/LHR seeding).
+
+---
+
+## 23. ARN 60° Lounge (non-Schengen, Gate F67) — not modelled
+
+**Risk:** Stockholm-Arlanda has a non-Schengen "60° Lounge" at Terminal 5 Gate
+F67 whose access rules are not yet confirmed from primary sources.
+
+**Action needed:** Confirm via Swedavia + oneworld lounge finder + Priority
+Pass whether the lounge accepts oneworld status, PP/LK/DP, or is airline-
+specific. Once confirmed, add via a Phase 22b-style patch.
+
+---
+
+## 24. SAS Lounges at ARN — Star Alliance, low priority
+
+**Risk:** SAS operates its own lounges at ARN (Business Lounge, Gold Lounge)
+open to Star Alliance status. Not added because the current data focus is
+Finnair-passenger-relevant lounges.
+
+**Action needed:** Seed when the app expands beyond Finnair-focused defaults.
+Requires the remaining Star Alliance carrier seeding tracked in §19.
+
+---
+
+## 25. Pearl Lounge Terminal 2 (ARN) opening hours unknown
+
+**Risk:** Swedavia's service page for ARN lists Pearl Lounge C37 hours
+(06:30–20:30) but not for the Terminal 2 lounge. The DB row has
+`opening_hours = NULL` for the T2 lounge, which means the engine will not
+close it outside real operating hours.
+
+**Action needed:** Confirm T2 hours from Swedavia or Plaza Premium and
+`UPDATE lounges SET opening_hours = ? WHERE id = 28`. Until then, the lounge
+appears always-open in the UI, which may produce false "allowed" results
+early morning or late night.
