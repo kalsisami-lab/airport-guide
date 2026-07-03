@@ -37,6 +37,12 @@ const CHANNEL_LABEL: Partial<Record<string, string>> = {
   invitation:     'Invitation',
 };
 
+const ALLIANCE_LABEL: Record<NonNullable<AllianceCode>, string> = {
+  oneworld:      'oneworld',
+  star_alliance: 'Star Alliance',
+  skyteam:       'SkyTeam',
+};
+
 // ─── Tier → alliance ──────────────────────────────────────────────────────────
 
 function tierToAlliance(tier: AllianceTier): AllianceCode {
@@ -259,6 +265,11 @@ export function evaluateLoungeAccess(
 
   // ── 4. ALLOW: access channels, rules sorted by priority DESC ──────────────
   let hasPaidChannel = false;
+  // Alliance fallback signals: set when an `all_alliance` rule would have matched
+  // the passenger's tier, but the alliance itself didn't (or was unknown).
+  // Precedence: allianceUnknown wins if both signals fire.
+  let allianceMismatch: AllianceCode = null;
+  let allianceUnknown: AllianceCode  = null;
 
   const candidates = lounge.channels.flatMap((ch) => {
     if (ch.channelType === 'paid') {
@@ -273,9 +284,49 @@ export function evaluateLoungeAccess(
   for (const { ch, rule } of candidates) {
     const result = evaluateChannelRule(ch, rule, passenger, status, evalCtx, cards);
     if (result) return result;
+
+    // Track "would have matched except alliance" — used when no channel grants access.
+    if (
+      ch.channelType === 'alliance_status' &&
+      ch.allianceAccess === 'all_alliance' &&
+      rule.minAllianceTier &&
+      status &&
+      meetsTier(status.allianceTier, rule.minAllianceTier) &&
+      (rule.conditions === null || evalCondition(rule.conditions, evalCtx))
+    ) {
+      const required = tierToAlliance(rule.minAllianceTier);
+      if (passenger.operatingAlliance === null) {
+        if (allianceUnknown === null) allianceUnknown = required;
+      } else if (passenger.operatingAlliance !== required) {
+        if (allianceMismatch === null) allianceMismatch = required;
+      }
+    }
   }
 
-  // ── 5. Default ────────────────────────────────────────────────────────────
+  // ── 5. Fallback outcomes ──────────────────────────────────────────────────
+  if (allianceUnknown !== null) {
+    const label = ALLIANCE_LABEL[allianceUnknown] ?? allianceUnknown;
+    return {
+      status:       'likely_allowed',
+      confidence:   0.6,
+      reason:       `Access likely if departing on a ${label} flight — add your flight to confirm`,
+      guest_allowed: false,
+      source:       'alliance_unknown_carrier',
+      accessVia:    label,
+    };
+  }
+
+  if (allianceMismatch !== null) {
+    const label = ALLIANCE_LABEL[allianceMismatch] ?? allianceMismatch;
+    return {
+      status:       'not_applicable',
+      confidence:   0.9,
+      reason:       `This is a ${label} lounge; your flight is on a different alliance carrier`,
+      guest_allowed: false,
+      source:       'alliance_mismatch',
+    };
+  }
+
   if (hasPaidChannel) {
     return {
       status:       'paid_available',

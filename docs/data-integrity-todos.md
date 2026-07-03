@@ -242,3 +242,86 @@ real-world outcome is unreliable" — or vice versa.
 
 Recommendation: start with (a). Escalate to (b) if we hit a case where the two meanings
 genuinely diverge and mislead a user.
+
+---
+
+## 17. Finnair Lounge / Platinum Wing HEL — over-restricted alliance rules
+
+**Status: RESOLVED (Phase 21).** Channel rules 1, 2, 3 previously had
+`alliance_access='carrier_specific'` with `carrier_restriction=['AY']`, which
+incorrectly limited alliance access to Finnair passengers only. Under oneworld
+rules, any Sapphire (Business/frequent flyer lounges) or Emerald (First-class
+lounges) status holder on any oneworld carrier can access. Fixed to
+`all_alliance` per `db/patch-hel-finnair-oneworld.ts`.
+
+Sources (two-source verification per §14 lesson C):
+  - oneworld.com/airport-lounges (primary)
+  - The Pointy Miles / HFP Platinum Wing reviews (secondary)
+
+`airline_own` channels (id=40, 41) with `carrier_restriction=['AY']` are
+correct and NOT changed — those model Finnair's own-airline access as a
+separate dimension.
+
+---
+
+## 18. Finnair HEL lounge weekend restriction claim — unverified
+
+**Risk:** One secondary source (theluxurytraveller.com review) claims that
+oneworld Sapphire holders have no access to Finnair's Premium Lounge (or
+Platinum Wing — the source is ambiguous) on weekends. This contradicts the
+oneworld.com policy, which lists no day-of-week restrictions, and would only
+make sense if Finnair extended Platinum-Wing courtesy access to Sapphires
+during weekdays (a Finnair-specific extension beyond alliance rules), then
+withdrew it on weekends.
+
+**Action needed:** Verify whether this restriction exists in current policy
+(FlyerTalk threads, Finnair.com FAQ, direct experience). If real, model as a
+`conditions` predicate or a blackout `exception_rule` on lounge id=1 or id=2,
+restricted to `day_of_week in (Sat, Sun)`.
+
+Do **not** add this restriction based on the single blog claim alone.
+
+---
+
+## 19. Seed missing Star Alliance / SkyTeam carriers
+
+**Status: PARTIAL (Phase 21).** SK (SAS) added to `airlines` with
+`alliance_id = 2` (star_alliance) to support the Phase 21 fallback logic
+(distinguish `allianceMismatch` from `allianceUnknown`).
+
+**Still missing:** SN (Brussels), OS (Austrian), OZ (Asiana), TG (Thai),
+SQ (Singapore), CA (Air China), NZ (Air NZ) — Star Alliance;
+MU (China Eastern), KE (Korean Air), RO (Tarom), VN (Vietnam), CI (China
+Airlines), MF (Xiamen), GA (Garuda), UX (Air Europa), SV (Saudia) — SkyTeam.
+
+**Action needed:** As the airport catalogue expands beyond the PoC 5 airports,
+seed these carriers so that alliance-mismatch detection works correctly for
+users flying them. Without seeding, `getAllianceForCarrier(X) = null` triggers
+`likely_allowed` (Phase 21 fallback) which is less informative than the true
+`not_applicable`.
+
+Ripple effect: also update `data/airlineStatuses.ts` /
+`hooks/useEntitlements.STATUS_TO_DB` if new FFPs are needed for testing.
+
+---
+
+## 20. UI rendering of `not_applicable` and `likely_allowed` statuses
+
+**Risk:** Phase 21 added two new outcomes to the engine that previously did
+not appear for lounge access:
+
+  - `not_applicable` — alliance mismatch (e.g. oneworld status + SAS flight
+    at an oneworld lounge). New source: `alliance_mismatch`.
+  - `likely_allowed` — carrier unknown but alliance status meets tier. New
+    source: `alliance_unknown_carrier`. Confidence 0.6.
+
+**Action needed:** Verify that `components/EntitlementLoungeCard.tsx` renders
+these statuses with appropriate colour, icon, and reason text. Check:
+  - Does the sort order in `STATUS_SORT` (types.ts) still make sense with
+    real-world mix (allowed first, then likely_allowed, then paid, then
+    not_applicable, then denied)?
+  - Does `likely_allowed` communicate the "add your flight" CTA visually,
+    or does the reason text alone suffice?
+  - Does `not_applicable` distinguish clearly from `denied`? Currently they
+    look similar; users may benefit from a different visual treatment
+    (e.g. muted colour + "for a different alliance" caption).
