@@ -325,3 +325,34 @@ these statuses with appropriate colour, icon, and reason text. Check:
   - Does `not_applicable` distinguish clearly from `denied`? Currently they
     look similar; users may benefit from a different visual treatment
     (e.g. muted colour + "for a different alliance" caption).
+
+---
+
+## 21. Restricted paid channels — Finnair Lounge Silver discount
+
+**Status: RESOLVED (Phase 21b).** Finnair Lounge (id=2 non-Schengen, id=3
+Schengen) now carries a restricted paid channel:
+`min_alliance_tier = oneworld_ruby`, `carrier_restriction = ['AY']`,
+`priority = 50`.
+
+**Engine change:** paid rules are evaluated in the main channel loop (Phase 21b)
+instead of via the `hasPaidChannel` flag. Alliance-mismatch / alliance-unknown
+signals still take precedence over paid_available so a user on the wrong
+alliance sees `not_applicable`, not `paid_available`.
+
+**Effect on Silver:**
+  - AY Silver + AY Economy → `paid_available` (via this new rule)
+  - AY Silver + AY Business/First → `allowed` (via existing airline_own
+    cabin rule at priority 90)
+  - No status + AY flight → `denied` (paid rule requires ruby tier — Finnair
+    Lounge is NOT open walk-in like Aspire)
+  - BA Silver + BA flight → `denied` (carrier ≠ AY)
+  - Silver + Schengen-only flight → non-Schengen lounge is
+    `physically_unreachable` (zone check unchanged)
+
+**NOT modelled:** Silver discount price (30 € / 4800 Avios per Finnair.com).
+The engine's `paid_available` status has no price field. Add a price/currency
+column or an amenity-style hint in `LoungeInputWithMeta` if the UI needs to
+show the discount amount.
+
+Source: https://www.finnair.com/en/smooth-travelling-at-helsinki-airport/finnair-lounges-at-helsinki-airport

@@ -175,8 +175,27 @@ function evaluateChannelRule(
       };
     }
 
-    case 'paid':
-      return null;  // handled separately as fallback
+    case 'paid': {
+      // Restricted paid rules gate walk-in access. An unrestricted paid rule
+      // (all NULLs) matches everyone → generic paid_available. A restricted
+      // paid rule requires the passenger to meet the tier + carrier gate
+      // (e.g. Finnair Lounge: Silver + AY only, not open walk-in).
+      if (rule.minAllianceTier) {
+        if (!status || !meetsTier(status.allianceTier, rule.minAllianceTier)) return null;
+      }
+      if (
+        rule.carrierRestriction &&
+        rule.carrierRestriction.length > 0 &&
+        !rule.carrierRestriction.includes(passenger.operatingCarrier)
+      ) return null;
+      return {
+        status:       'paid_available',
+        confidence:   rule.confidence,
+        reason:       'Access available for purchase',
+        guest_allowed: false,
+        source:       `channel:${channel.id}:rule:${rule.id}`,
+      };
+    }
 
     default:
       return null;
@@ -264,26 +283,36 @@ export function evaluateLoungeAccess(
   }
 
   // ── 4. ALLOW: access channels, rules sorted by priority DESC ──────────────
-  let hasPaidChannel = false;
+  // Paid rules are included in the main loop (Phase 21 refactor). This lets
+  // restricted paid channels (e.g. Finnair Lounge: Silver + AY only) act as
+  // proper gated access rules, not as an open walk-in fallback flag.
   // Alliance fallback signals: set when an `all_alliance` rule would have matched
   // the passenger's tier, but the alliance itself didn't (or was unknown).
   // Precedence: allianceUnknown wins if both signals fire.
   let allianceMismatch: AllianceCode = null;
   let allianceUnknown: AllianceCode  = null;
 
-  const candidates = lounge.channels.flatMap((ch) => {
-    if (ch.channelType === 'paid') {
-      hasPaidChannel = true;
-      return [];
-    }
-    return ch.rules
+  const candidates = lounge.channels.flatMap((ch) =>
+    ch.rules
       .filter((r) => isActive(r.validFrom, r.validTo, now))
-      .map((r) => ({ ch, rule: r }));
-  }).sort((a, b) => b.rule.priority - a.rule.priority);
+      .map((r) => ({ ch, rule: r })),
+  ).sort((a, b) => b.rule.priority - a.rule.priority);
+
+  // Paid results are deferred: alliance-mismatch / alliance-unknown signals
+  // take precedence over showing paid_available (users benefit more from
+  // "this lounge is for a different alliance" than from "you can pay").
+  let paidResult: AccessResult | null = null;
 
   for (const { ch, rule } of candidates) {
     const result = evaluateChannelRule(ch, rule, passenger, status, evalCtx, cards);
-    if (result) return result;
+
+    if (result) {
+      if (ch.channelType === 'paid') {
+        if (paidResult === null) paidResult = result;
+        continue;
+      }
+      return result;
+    }
 
     // Track "would have matched except alliance" — used when no channel grants access.
     if (
@@ -327,15 +356,7 @@ export function evaluateLoungeAccess(
     };
   }
 
-  if (hasPaidChannel) {
-    return {
-      status:       'paid_available',
-      confidence:   0.9,
-      reason:       'Access available for purchase',
-      guest_allowed: false,
-      source:       'paid_channel',
-    };
-  }
+  if (paidResult !== null) return paidResult;
 
   return {
     status:       'denied',

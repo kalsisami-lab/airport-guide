@@ -255,3 +255,127 @@ describe('Phase 21 — §17 regression: HEL Finnair Lounges', () => {
     assert.equal(r.source, 'alliance_mismatch');
   });
 });
+
+// ─── B1–B7: Restricted paid channel (Finnair Silver discount) ────────────────
+
+// Mirrors DB post-Phase 21b: lounge id=3 has three channels — alliance_status,
+// airline_own with cabin condition, and paid restricted to oneworld_ruby + AY.
+function makeFinnairLoungeSchengenWithPaid(): LoungeInput {
+  return makeLounge([
+    makeChannel('alliance_status', 'all_alliance', [
+      makeRule({ minAllianceTier: 'oneworld_sapphire', confidence: 0.99, priority: 100 }),
+    ], 3),
+    makeChannel('airline_own', null, [
+      makeRule({
+        carrierRestriction: ['AY'],
+        conditions: { op: 'in', field: 'passenger.cabin', values: ['business', 'first'] },
+        confidence: 0.95, priority: 90,
+      }),
+    ], 41),
+    makeChannel('paid', null, [
+      makeRule({
+        minAllianceTier: 'oneworld_ruby',
+        carrierRestriction: ['AY'],
+        confidence: 0.9, priority: 50,
+      }),
+    ], 60),
+  ], { id: 3, name: 'Finnair Lounge', area: 'schengen' });
+}
+
+function makeFinnairLoungeNonSchengenWithPaid(): LoungeInput {
+  return makeLounge([
+    makeChannel('alliance_status', 'all_alliance', [
+      makeRule({ minAllianceTier: 'oneworld_sapphire', confidence: 0.99, priority: 100 }),
+    ], 2),
+    makeChannel('airline_own', null, [
+      makeRule({
+        carrierRestriction: ['AY'],
+        conditions: { op: 'in', field: 'passenger.cabin', values: ['business', 'first'] },
+        confidence: 0.95, priority: 90,
+      }),
+    ], 40),
+    makeChannel('paid', null, [
+      makeRule({
+        minAllianceTier: 'oneworld_ruby',
+        carrierRestriction: ['AY'],
+        confidence: 0.9, priority: 50,
+      }),
+    ], 59),
+  ], { id: 2, name: 'Finnair Lounge', area: 'non_schengen' });
+}
+
+describe('Phase 21b — Finnair Lounge restricted paid (Silver + AY)', () => {
+
+  test('B1: AY Silver (oneworld_ruby) + AY Economy → paid_available', () => {
+    const p = makePassenger({
+      operatingCarrier: 'AY', operatingAlliance: 'oneworld', cabin: 'economy',
+      arrivalAirport: 'FRA', arrivalCountryCode: 'DE', arrivalIsSchengen: true,
+    });
+    const s = makeStatus('oneworld_ruby');
+    const r = evaluateLoungeAccess(p, s, makeFinnairLoungeSchengenWithPaid(), { now: NOW });
+    assert.equal(r.status, 'paid_available');
+  });
+
+  test('B2: no status + AY Economy → denied (paid requires ruby tier — not open walk-in)', () => {
+    const p = makePassenger({
+      operatingCarrier: 'AY', operatingAlliance: 'oneworld', cabin: 'economy',
+      arrivalAirport: 'FRA', arrivalCountryCode: 'DE', arrivalIsSchengen: true,
+    });
+    const r = evaluateLoungeAccess(p, null, makeFinnairLoungeSchengenWithPaid(), { now: NOW });
+    assert.equal(r.status, 'denied');
+  });
+
+  test('B3: BA Silver (oneworld_ruby) + BA flight to LHR + Finnair Lounge non-Schengen → denied (carrier ≠ AY, tier below sapphire)', () => {
+    // BA791 HEL→LHR is a natural non-Schengen BA route; use the non-Schengen
+    // fixture so the zone check does not short-circuit before the paid rule.
+    const p = makePassenger({
+      operatingCarrier: 'BA', operatingAlliance: 'oneworld', cabin: 'economy',
+      arrivalAirport: 'LHR', arrivalCountryCode: 'GB', arrivalIsSchengen: false,
+    });
+    const s = makeStatus('oneworld_ruby');
+    const r = evaluateLoungeAccess(p, s, makeFinnairLoungeNonSchengenWithPaid(), { now: NOW });
+    assert.equal(r.status, 'denied');
+  });
+
+  test('B4: AY Silver + AY-Schengen flight (HEL→FRA) + Finnair Lounge non-Schengen → physically_unreachable', () => {
+    const p = makePassenger({
+      operatingCarrier: 'AY', operatingAlliance: 'oneworld', cabin: 'economy',
+      arrivalAirport: 'FRA', arrivalCountryCode: 'DE', arrivalIsSchengen: true,
+    });
+    const s = makeStatus('oneworld_ruby');
+    const r = evaluateLoungeAccess(p, s, makeFinnairLoungeNonSchengenWithPaid(), { now: NOW });
+    assert.equal(r.status, 'physically_unreachable');
+    assert.equal(r.source, 'schengen_zone_check');
+  });
+
+  test('B5: AY Silver + AY-Schengen flight + Finnair Lounge Schengen (id=3) → paid_available', () => {
+    const p = makePassenger({
+      operatingCarrier: 'AY', operatingAlliance: 'oneworld', cabin: 'economy',
+      arrivalAirport: 'FRA', arrivalCountryCode: 'DE', arrivalIsSchengen: true,
+    });
+    const s = makeStatus('oneworld_ruby');
+    const r = evaluateLoungeAccess(p, s, makeFinnairLoungeSchengenWithPaid(), { now: NOW });
+    assert.equal(r.status, 'paid_available');
+  });
+
+  test('B6 (regression): AY Gold + AY Economy → allowed via alliance_status (paid rule exists but does not fire)', () => {
+    const p = makePassenger({
+      operatingCarrier: 'AY', operatingAlliance: 'oneworld', cabin: 'economy',
+      arrivalAirport: 'FRA', arrivalCountryCode: 'DE', arrivalIsSchengen: true,
+    });
+    const s = makeStatus('oneworld_sapphire');
+    const r = evaluateLoungeAccess(p, s, makeFinnairLoungeSchengenWithPaid(), { now: NOW });
+    assert.equal(r.status, 'allowed');
+    assert.match(r.reason, /oneworld_sapphire/);
+  });
+
+  test('B7 (regression): AY Silver + AY Business → allowed via airline_own (cabin match wins over paid)', () => {
+    const p = makePassenger({
+      operatingCarrier: 'AY', operatingAlliance: 'oneworld', cabin: 'business',
+      arrivalAirport: 'FRA', arrivalCountryCode: 'DE', arrivalIsSchengen: true,
+    });
+    const s = makeStatus('oneworld_ruby');
+    const r = evaluateLoungeAccess(p, s, makeFinnairLoungeSchengenWithPaid(), { now: NOW });
+    assert.equal(r.status, 'allowed');
+  });
+});
