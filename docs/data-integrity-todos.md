@@ -417,3 +417,31 @@ close it outside real operating hours.
 `UPDATE lounges SET opening_hours = ? WHERE id = 28`. Until then, the lounge
 appears always-open in the UI, which may produce false "allowed" results
 early morning or late night.
+
+---
+
+## 26. AGP Sala VIP opening hours — source conflict
+
+**Risk:** Aena's website lists Sala VIP AGP as "00:00–23:59" (implying 24h);
+Priority Pass and secondary review sources list 05:30–22:30. The DB row uses
+`Daily 05:30–22:30` conservatively so the engine returns `closed` outside
+those hours instead of `paid_available` overnight.
+
+**Action needed:** Verify on-site (Sami will confirm during Málaga trip)
+whether the lounge is actually open overnight. If yes, update to 24h.
+
+---
+
+## 27. AGP Sala VIP LK/DP channels — inferred from PP network
+
+**Risk:** The `lounge_key` (conf 0.85) and `dragon_pass` (conf 0.8) channels
+on Sala VIP (id=31) are set from PP-network membership, not a per-app
+verification. Priority Pass lists Sala VIP directly (conf 0.9), but LK/DP
+are inferred to also work (same operator, same access model).
+
+**Action needed:** Confirm by looking up "Málaga Airport" in the LoungeKey
+and DragonPass apps. Update `source_url` on the respective rules to the
+per-app deep link once verified.
+
+Same inference pattern as §14 (Plaza Premium HEL PP/LK/DP). Track together
+if these need to be re-verified in bulk.
