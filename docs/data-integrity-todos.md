@@ -700,3 +700,73 @@ the standard Greek channel set once confirmed.
 lounge listings. If PP-lounges exist, seed them in a PP-only batch
 following the AGP Sala VIP shape (no alliance_status channel — clean
 negative case for oneworld access).
+
+---
+
+## 40. Portuguese + Italian lounge opening hours unknown (Phase 28)
+
+**Risk:** ANA (Portuguese airports) and the various Italian operators
+(Aspire, local Sala VIP concessions) do not publish per-lounge opening
+hours reliably on their operator sites. All 13 Phase 28 lounges seeded
+with `opening_hours = NULL`:
+  - LIS ANA Lounge (id=50), OPO ANA Lounge (id=51)
+  - FAO CIP Lounge (id=52), FAO CIP Lounge Schengen (id=53)
+  - FNC ANA Airport Lounge (id=54)
+  - NAP Pearl Lounge (id=55), VCE Marco Polo (id=56), BLQ Prima Vista (id=57)
+  - PSA Sala VIP Galilei (id=58), FLR Aeroporti VIP Club (id=59)
+  - CTA Angelo D'Arrigo (id=60), VRN Catullo (id=61), TRN Piemonte (id=62)
+
+Same shape as §35 (Aena Spain) and §38 (Goldair/Skyserv Greece). Higher
+UX impact at smaller Italian regional airports (CTA, VRN, TRN) where
+lounges may open only for scheduled long-haul departures rather than
+throughout the day.
+
+**Action needed:** Verify from LoungePair / PP app per lounge, then
+`UPDATE lounges SET opening_hours = ? WHERE id = ?`. Consider one big
+verification pass across §35 / §38 / §40 (25 lounges total).
+
+---
+
+## 41. FAO CIP Lounge zone assignment — assumption, not verified
+
+**Risk:** FAO has two lounges seeded with different zone assignments:
+  - `CIP Lounge`          (id=52, area='non_schengen')
+  - `CIP Lounge Schengen` (id=53, area='schengen')
+
+The non-Schengen assignment on id=52 is inferred from the existence of
+a distinct `CIP Lounge Schengen` under the same operator — the base
+name is presumed to serve the non-Schengen sector. Not verified against
+FAO's terminal map or on-site signage.
+
+**Impact if wrong:** A Finnair Schengen passenger from FAO would still
+get correct behavior at CIP Lounge Schengen (id=53, `allowed`). But if
+id=52 is actually Schengen too (i.e., two Schengen CIP lounges, not one
+per zone), a Schengen passenger would see id=52 as
+`physically_unreachable` when it should be `paid_available` or `allowed`.
+The opposite mistake — if the split is real and id=52 is genuinely non-
+Schengen — is the current seeded state and produces correct results.
+
+**Action needed:** Verify on-site FAO or via LoungePair terminal map.
+If both lounges are Schengen, `UPDATE lounges SET area='schengen'
+WHERE id=52` and update the seed comment. Same shape as CPH Eventyr
+non-Schengen assignment (Phase 24), which was verified against oneworld.com's
+terminal-specific listing — FAO has no such per-terminal listing.
+
+---
+
+## 42. LIS Blue Lounge (PP-only) deferred
+
+**Risk:** LIS has a Blue Lounge in Terminal 1 that is on the Priority
+Pass network but NOT listed on oneworld.com (no oneworld carrier
+access). Not seeded in Phase 28 because the batch's model requires an
+`alliance_status` channel. A PP-card holder at LIS currently sees only
+ANA Lounge (Schengen area, oneworld-listed) — they miss out on Blue
+Lounge as an alternative PP option.
+
+**Action needed:** Seed LIS Blue Lounge in a PP-only batch following
+the AGP Sala VIP shape (Phase 23) — no `alliance_status` channel, just
+`priority_pass` + `lounge_key` + `dragon_pass` + `paid`. May also apply
+to Italian regional airports (need audit).
+
+Track together with §39b (JTR/KGS/CHQ PP-only lounges) — the two form a
+natural PP-only batch across leisure destinations.
