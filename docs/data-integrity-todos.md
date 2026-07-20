@@ -651,3 +651,52 @@ apps. Update `source_url` on the respective rules to per-app deep links
 once verified.
 
 Track together with §14 and §27 if these need to be re-verified in bulk.
+
+---
+
+## 38. Greek Goldair / Skyserv lounge opening hours unknown
+
+**Risk:** Neither Goldair Handling nor Skyserv publishes reliable per-
+lounge opening hours on their operator sites. All six Phase 27 lounges
+were seeded with `opening_hours = NULL`:
+  - CFU Goldair Handling         (id=44)
+  - HER Filoxenia                (id=45)
+  - RHO Goldair Handling         (id=46)
+  - JMK CIP by Goldair           (id=47)
+  - SKG Manolis Andronikos       (id=48)
+  - SKG Prima Vista              (id=49)
+
+Same UX consequence as §35 (Aena Sala VIP): the engine cannot close
+these outside real operating hours and may over-return `allowed` /
+`paid_available` early morning or late evening. Impact is higher at
+seasonal Greek islands (CFU, RHO, JMK) where lounges may open only for
+scheduled departures.
+
+**Action needed:** Verify per-lounge hours from LoungePair listings or
+the PP app, then `UPDATE lounges SET opening_hours = ? WHERE id = ?`
+for each. Track with §35 as a joint verification pass.
+
+---
+
+## 39. Greek lounges deferred — RHO Skyserv (closed) and JTR/KGS/CHQ (no oneworld)
+
+**Risk (a):** RHO Skyserv Lounge is temporarily closed as of Phase 27
+seeding. Not added; a would-be lounge id would sit unused. Adding it
+later must be a NEW insert (not idempotent-skipped) once reopened.
+
+**Risk (b):** Santorini (JTR), Kos (KGS), and Chania (CHQ) do not have a
+oneworld lounge on oneworld.com's per-airport pages. They may have PP-
+only lounges operated by Goldair or Skyserv (worth checking), but were
+excluded from Phase 27 because the batch's model requires an oneworld
+carrier list. Seeding them would require either a PP-only lounge shape
+(no `alliance_status` channel — same as AGP Sala VIP in Phase 23) or
+confirmation that a oneworld lounge exists.
+
+**Action needed (a):** Watch skyserv.aero and prioritypass.com for RHO
+Skyserv reopening. Seed as a new lounge under airport_id for RHO with
+the standard Greek channel set once confirmed.
+
+**Action needed (b):** Cross-check prioritypass.com for JTR / KGS / CHQ
+lounge listings. If PP-lounges exist, seed them in a PP-only batch
+following the AGP Sala VIP shape (no alliance_status channel — clean
+negative case for oneworld access).
