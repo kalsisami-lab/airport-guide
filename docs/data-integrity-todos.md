@@ -578,3 +578,76 @@ Alliance carrier seeding from §19.
 **Action needed (b):** Add DNB/Sparebank1 Elite entries to
 `data/creditCards.ts` with the appropriate `loungeAccess` values. May
 need a new `bank_partner` channel (see §30 for the Danske Bank parallel).
+
+---
+
+## 35. Aena Sala VIP opening hours unknown (PMI, ALC, VLC, LPA)
+
+**Risk:** Aena's per-airport VIP Services pages do not publish reliable
+opening hours for individual Sala VIP lounges. All six Phase 26 lounges
+were seeded with `opening_hours = NULL`:
+  - PMI Llevant (id=38), Mediterraneo (id=39), Valldemosa (id=40)
+  - ALC Costa Blanca (id=41)
+  - VLC Joan Olivert (id=42)
+  - LPA Sala Galdos (id=43)
+
+The engine cannot close them outside real operating hours and may return
+`allowed` or `paid_available` early morning / late evening when the
+lounges are actually shut.
+
+**Action needed:** Verify per-airport hours (on-site, LoungePair
+listings, or PP app), then
+`UPDATE lounges SET opening_hours = ? WHERE id = ?` for each.
+
+Same shape as §25 (ARN Pearl T2), §26 (AGP Sala VIP source conflict),
+§28 (CPH Aviator lounges).
+
+---
+
+## 36. Carrier restriction seeding rule — Finnair (AY) always included at Finnair-network airports
+
+**Risk (seeding rule, not a data gap):** oneworld.com's per-airport lounge
+finder shows only the carriers currently operating at query time. Finnair
+(AY) flies to leisure destinations (Canaries, partial Mediterranean) on a
+winter schedule, so a summer snapshot omits AY. A naive "trust
+oneworld.com" seed would drop AY from every lounge's carrier list, and
+winter AY passengers would see incorrect "no access" results.
+
+**Rule adopted from Phase 26 onward:**
+> Any oneworld lounge at an airport in the Finnair route network
+> (i.e., airports seeded from the Phase 20 Finnair-network table) MUST
+> include AY in its `carrier_restriction` list, even if the current
+> oneworld.com snapshot does not show AY.
+
+**First-hand verification behind the rule:** User accessed LPA Sala Galdos
+with Finnair Platinum, Winter 2026. Without the rule, LPA Sala Galdos
+would have been seeded as `[BA, IB, AT]` and the user's known-good
+access would have been reported as `paid_available`.
+
+**Action needed:** Apply the same rule to all subsequent leisure-airport
+batches. Do NOT need to re-verify per-lounge — the rule is derived from
+oneworld membership + Finnair route inclusion, both of which are stable
+facts. Re-check only if either changes (Finnair drops the route, or AY
+leaves oneworld — neither expected).
+
+**Confidence choice:** Phase 26 lounges use `confidence: 0.95` on the
+alliance_status rule (vs 0.99 elsewhere) to reflect that the carrier list
+is rule-derived rather than snapshot-verified.
+
+---
+
+## 37. Aena Sala VIP LK/DP channels — inferred from PP network
+
+**Risk:** All six Phase 26 lounges have `lounge_key` (conf 0.85) and
+`dragon_pass` (conf 0.8) channels inferred from PP-network membership,
+same as AGP Sala VIP (§27) and HEL Plaza Premium (§14). Priority Pass
+lists each lounge directly (conf 0.9), but LK/DP are inferred to also
+work (same operator, same access model — Aena outsources Sala VIP
+management to Petit Palace / Sodexo depending on the airport, and both
+operators contract with all three networks).
+
+**Action needed:** Confirm each lounge in the LoungeKey and DragonPass
+apps. Update `source_url` on the respective rules to per-app deep links
+once verified.
+
+Track together with §14 and §27 if these need to be re-verified in bulk.
