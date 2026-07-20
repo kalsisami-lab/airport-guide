@@ -515,3 +515,66 @@ data focus is Finnair-passenger-relevant lounges.
 **Action needed:** Seed when the app expands beyond Finnair-focused
 defaults. Same deferral as ARN §24 — track together with the remaining
 Star Alliance carrier seeding from §19.
+
+---
+
+## 32. OSL Lounge / Premium — weekday-scoped opening hours
+
+**Risk:** OSL Lounge (id=36) is `Mon-Fri 05:30–20:30` — closed Sat/Sun.
+OSL Premium (id=37) is `Mon-Fri 09:00–19:00, Sat closed, Sun 12:00–19:00`.
+The `opening_hours` column is a single free-text string and the engine's
+closed-check does not parse weekday scopes. Result: a Saturday query will
+return `allowed`/`paid_available` even though OSL Lounge is physically
+closed.
+
+**Action needed:** Extend the engine's opening-hours parser to understand
+weekday prefixes (`Mon-Fri`, `Sat closed`, `Sun 12:00–19:00`), or split
+`opening_hours` into a structured column (JSON: `{mon: "05:30-20:30",
+sat: null, ...}`). Prefer the parser — schema change costs more than the
+regex, and every airport we add is going to have weekday variance.
+
+---
+
+## 33. Amex Centurion vs Amex Platinum — engine cannot distinguish
+
+**Risk:** `hooks/useEntitlements.ts:31` maps `amex-platinum` (the only Amex
+card in `data/creditCards.ts`) → `amex_centurion` (the engine channel).
+That means anywhere a lounge has an `amex_centurion` channel, an Amex
+Platinum holder qualifies. Real Amex Centurion is a much rarer, invite-only
+card with broader access than Platinum. If a lounge is genuinely
+Centurion-only (e.g., true Amex Centurion Rooms), we currently over-grant.
+
+**Impact today:** OSL Premium Lounge (id=37) is marketed as
+"Centurion access" per Amex; we treat it as Platinum-accessible via the
+shared channel. Same shape at ARN Amex Lounge (Phase 22 id=30) and any
+future amex_centurion lounge.
+
+**Action needed:** Add `amex_platinum` (Platinum-only) as a distinct
+`ChannelType` in `lib/engine/types.ts`, add a corresponding `amex-centurion`
+card entry in `creditCards.ts`, and re-map:
+  - `amex-platinum`  → `amex_platinum`
+  - `amex-centurion` → `amex_centurion`
+Then re-issue Centurion-only lounges with `amex_centurion` alone and
+Platinum-inclusive lounges with both channels.
+
+---
+
+## 34. OSL — SAS lounges + Norwegian bank cards deferred
+
+**Risk (a):** SAS operates its own lounges at OSL (Business, Gold, and
+lounges under the SAS Go/Plus contract for Star Alliance status). Not
+added because current data focus is Finnair-passenger-relevant lounges.
+Same shape as ARN §24 and CPH §31.
+
+**Risk (b):** Several Norwegian bank cards (DNB, Sparebank1 Elite) grant
+OSL Lounge access as a card benefit. `data/creditCards.ts` has no
+Norwegian bank cards, so these paths are not modeled. A Norwegian card
+holder is currently under-served: the engine returns `paid_available` at
+OSL Lounge when the card would actually grant `allowed`.
+
+**Action needed (a):** Seed SAS lounges together with the remaining Star
+Alliance carrier seeding from §19.
+
+**Action needed (b):** Add DNB/Sparebank1 Elite entries to
+`data/creditCards.ts` with the appropriate `loungeAccess` values. May
+need a new `bank_partner` channel (see §30 for the Danske Bank parallel).
