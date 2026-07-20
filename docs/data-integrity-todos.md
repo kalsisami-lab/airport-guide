@@ -445,3 +445,73 @@ per-app deep link once verified.
 
 Same inference pattern as §14 (Plaza Premium HEL PP/LK/DP). Track together
 if these need to be re-verified in bulk.
+
+---
+
+## 28. CPH Aviator lounges opening hours unknown
+
+**Risk:** cph.dk publishes opening hours for Aspire (06:00–20:00) and Eventyr
+(05:30–20:00) but not for Danske Bank Aviator Business Lounge or Carlsberg
+Aviator Lounge. Both DB rows have `opening_hours = NULL`, so the engine will
+not close them outside real operating hours and may return `allowed` or
+`paid_available` early morning / late night when the lounges are actually
+shut.
+
+**Action needed:** Verify on-site or via cph.dk operator listing, then
+`UPDATE lounges SET opening_hours = ? WHERE id IN (32, 35)` (Danske Bank
+Aviator, Carlsberg Aviator).
+
+Same shape as §25 (ARN Pearl Lounge T2 hours unknown).
+
+---
+
+## 29. Eventyr Lounge alias "Pearl Lounge" + Danske Bank Aviator channel oddity
+
+**Risk (a):** oneworld.com lists the Eventyr Lounge at CPH under the name
+"Pearl Lounge" (unrelated to Plaza Premium's Pearl Lounges at ARN — same
+brand name, different operators). The `lounges` table has no `aliases`
+column, so the alias is only recorded in `location_description` as
+"(oneworld.com lists as 'Pearl Lounge')". A future search by that name
+will not find the row.
+
+**Risk (b):** Danske Bank Aviator Business Lounge (id=32) has `lounge_key`
+and `dragon_pass` channels but NOT `priority_pass`. This combination is
+unusual — most LK/DP lounges are also on the PP network. If a later source
+confirms Danske Bank Aviator is in fact PP-listed, add the PP channel.
+
+**Action needed (a):** Schema migration adding `lounges.aliases` (TEXT,
+JSON array of strings), backfill Eventyr with `["Pearl Lounge"]`, then
+strip the parenthetical from `location_description`.
+
+**Action needed (b):** Cross-check prioritypass.com Copenhagen listing for
+Danske Bank Aviator specifically. If present, add PP channel via a small
+patch and remove this note.
+
+---
+
+## 30. Danske Bank customer channel modeling (`bank_partner`)
+
+**Risk:** Danske Bank customers currently reach the Danske Bank Aviator
+Business Lounge via the `lounge_key` channel, because `data/creditCards.ts`
+maps `danske-platinum` → `loungeAccess: ['lounge-key']`. This works for the
+current card catalog but conflates two access rights: LK network membership
+and bank-branded lounge access. Real Danske Bank World Elite / private
+banking cards may have broader guest policies at this lounge than LK gives.
+
+**Action needed:** When a card in the catalog requires access broader than
+LK (guest count, no-blackout, etc.), introduce a `bank_partner` channel
+type in `lib/engine/types.ts::ChannelType`, add UI card→channel mapping in
+`hooks/useEntitlements.ts`, and re-issue the Danske Bank Aviator channels
+with `bank_partner` alongside `lounge_key`.
+
+---
+
+## 31. SAS Lounges at CPH — Star Alliance, low priority
+
+**Risk:** SAS operates multiple own lounges at CPH (Business/Gold, Schengen
+and non-Schengen) open to Star Alliance status. Not added because current
+data focus is Finnair-passenger-relevant lounges.
+
+**Action needed:** Seed when the app expands beyond Finnair-focused
+defaults. Same deferral as ARN §24 — track together with the remaining
+Star Alliance carrier seeding from §19.
