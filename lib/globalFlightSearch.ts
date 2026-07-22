@@ -36,6 +36,13 @@ const AIRLINE_ORIGINS: Record<string, { iata: string; name: string; city: string
 };
 
 // ── Extended route table (simulated global database) ─────────────────────────
+//
+// ⚠ DEMO / FALLBACK DATA — hand-written seasonal snapshot. Not authoritative.
+// TODO(§48): the same flight number can serve a different route in summer vs winter.
+//   Real source of truth is Aviationstack — set FLIGHT_API_KEY server-side and the
+//   priority order in searchGlobalFlight() will prefer the API over this table.
+// TODO(§49): once FLIGHT_API_KEY is reliably present in prod, consider deleting this
+//   table entirely — a stale snapshot is worse than a well-shaped "not found".
 const EXTENDED_ROUTES: Record<string, Omit<GlobalSearchResult, 'flightNumber'>> = {
   // Turkish Airlines (TK)
   'TK1':    { airline: 'Turkish Airlines', source: 'global-db', confidence: 'confirmed', origin: { iata: 'IST', name: 'Istanbul Airport', city: 'Istanbul' }, destination: { iata: 'JFK', city: 'New York JFK', country: 'United States', schengen: false }, departureTime: '11:00', arrivalTime: '14:30', aircraft: 'B777-300ER' },

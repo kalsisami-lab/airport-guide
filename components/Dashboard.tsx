@@ -238,9 +238,12 @@ export default function Dashboard() {
     [airportDests],
   );
 
+  // Priority: (1) manual pick from the destination dropdown, (2) flight-number lookup.
+  // Manual wins so a user who explicitly chose X isn't overridden by a snapshot/heuristic route.
+  // Airline code + origin airport still come from flightNumber independently (see airlineCode, applyAirport).
   const resolvedDest: Destination | null = useMemo(() => {
-    if (effectiveDest) return effectiveDest;
     if (manualDestIata) return airportDests.find((d) => d.iata === manualDestIata) ?? null;
+    if (effectiveDest) return effectiveDest;
     return null;
   }, [effectiveDest, manualDestIata, airportDests]);
 
@@ -449,7 +452,8 @@ export default function Dashboard() {
                   onChange={(e) => {
                     const val = e.target.value.toUpperCase();
                     setFlightNumber(val);
-                    setManualDestIata(null);
+                    // Do NOT clear manualDestIata here — a user's manual pick must survive
+                    // typing a flight number (manual wins in resolvedDest).
                     resetGlobal();
                     setFlightSwapped(false);
                     setGateManuallySet(false);
@@ -552,6 +556,12 @@ export default function Dashboard() {
                     )}
                   </div>
                 </div>
+                {'confidence' in rawFlight && rawFlight.confidence === 'estimated' && !manualDestIata && (
+                  <div className="mt-2 flex items-start gap-2 rounded-lg bg-amber-500/10 border border-amber-500/30 px-3 py-2 text-xs text-amber-300">
+                    <span aria-hidden>⚠</span>
+                    <span>Estimated destination — verify or select manually.</span>
+                  </div>
+                )}
                 <button
                   onClick={() => {
                     const newSwapped = !flightSwapped;

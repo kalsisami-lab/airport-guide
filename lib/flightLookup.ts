@@ -16,6 +16,14 @@ type RouteRecord = Omit<FlightInfo, 'flightNumber'>;
 
 // Global route table — keyed by flight number only, regardless of departure airport.
 // Each entry carries its own origin so the engine can auto-set the airport.
+//
+// ⚠ DEMO / FALLBACK DATA — hand-written seasonal snapshot. Not authoritative.
+// TODO(§48): the same flight number can serve a different route in summer vs winter
+//   (e.g. AY2 may fly LHR→HEL in one season and a different origin the next).
+//   The real source of truth is Aviationstack — set FLIGHT_API_KEY in production and
+//   the engine (searchGlobalFlight in lib/globalFlightSearch.ts) will prefer the API.
+// TODO(§49): once FLIGHT_API_KEY is reliably present in prod, consider deleting this
+//   table entirely — a stale snapshot is worse than a well-shaped "not found".
 const ROUTES: Record<string, RouteRecord> = {
   // ── Finnair (AY) departing HEL ──────────────────────────────────────────────
   'AY1':   { airline: 'Finnair', origin: { iata: 'HEL', name: 'Helsinki-Vantaa', city: 'Helsinki' },  destination: { iata: 'LHR', city: 'London Heathrow',        country: 'United Kingdom', schengen: false }, departureTime: '08:15', arrivalTime: '10:25', aircraft: 'A350-900',  previousGate: '35' },
