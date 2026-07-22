@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { GlobalSearchResult } from '@/lib/globalFlightSearch';
 import { AIRPORT_META } from '@/lib/airportCountryData';
+import { hasRealFlightKey } from '@/lib/flightApiKey';
 
 // ── Aviationstack response shape (subset) ────────────────────────────────────
 interface AviationFlightRow {
@@ -65,8 +66,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Missing flight parameter' }, { status: 400 });
   }
 
-  // Client-supplied key (from localStorage settings) takes precedence over env var
-  const apiKey = req.headers.get('x-flight-api-key') ?? process.env.FLIGHT_API_KEY;
+  // Client-supplied key (from localStorage settings) takes precedence over env var.
+  // Reject placeholder values (see lib/flightApiKey.ts) — otherwise a .env.local template
+  // string is treated as "present" and the API call fails silently.
+  const rawKey = req.headers.get('x-flight-api-key') ?? process.env.FLIGHT_API_KEY;
+  const apiKey = hasRealFlightKey(rawKey) ? rawKey : null;
 
   if (apiKey) {
     try {

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isSchengenCountry } from '@/lib/airportCountryData';
+import { hasRealFlightKey } from '@/lib/flightApiKey';
 
 interface AviationAirportRow {
   airport_name: string;
@@ -24,7 +25,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ airports: [], source: 'local' });
   }
 
-  const apiKey = req.headers.get('x-flight-api-key') ?? process.env.FLIGHT_API_KEY;
+  // Same placeholder-guard as /api/flight (see lib/flightApiKey.ts, TODO §50).
+  const rawKey = req.headers.get('x-flight-api-key') ?? process.env.FLIGHT_API_KEY;
+  const apiKey = hasRealFlightKey(rawKey) ? rawKey : null;
 
   if (apiKey) {
     try {
