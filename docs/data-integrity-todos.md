@@ -951,3 +951,22 @@ Given a lounge name from oneworld.com's per-airport listing:
 **Action needed:** None — this is a rule statement. Encoded in
 `scripts/classify-lounges.ts` as a check-and-report utility. Run before
 each new seeding batch to see the shape counts and any AMBIG cases.
+
+---
+
+## 48. NRT Cathay Pacific Lounge — temporarily closed
+
+**Risk:** Cathay Pacific Lounge at NRT Terminal 2 (Level 2, Gate 71) is
+temporarily closed as of Phase 31 seeding (oneworld.com listing shows
+"Temporarily Closed" suffix on the lounge card). Not seeded. NRT
+already has JAL First Class Lounge + JAL Sakura Domestic + JAL Sakura
+International (all seeded Phase 31), so a Finnair Sapphire+ passenger
+transiting NRT already has three oneworld lounge options. Impact of
+the closure is limited to CX-loyal customers who prefer their own
+brand.
+
+**Action needed:** Watch oneworld.com/airport-lounge-results?location=NRT
+and cathaypacific.com/lounges for reopening. Seed as a new lounge under
+airport_id for NRT (id=112) with the standard Ryhmä 2 shape
+(alliance_status/all_alliance/oneworld_sapphire/conf 0.99). Same shape
+as §39a (RHO Skyserv) and §44 (PRG Menzies) deferrals.
