@@ -186,7 +186,11 @@ describe('FRA', () => {
 // ─── LHR ─────────────────────────────────────────────────────────────────────
 
 describe('LHR', () => {
-  test('BA Gold + BA-lento → Concorde Room (emerald+BA) allowed, Galleries Club allowed', () => {
+  // Concorde Room: airline_own [BA,IB] + conditions cabin='first'. No status gate.
+  // Källa: käyttäjän ensikäden kokemus 2026 — oneworld Emerald + BA Business = denied,
+  // vaatii First-lipun. (patch-lhr-concorde-room-cabin-fix.ts)
+
+  test('BA Gold + BA-lento + Economy → Concorde Room denied (cabin gate — First required), Galleries Club allowed', () => {
     const r = findEntitlementsAtAirport(
       { statusCards: [{ programCode: 'ba-exec-club', tierName: 'Gold' }] },
       { operatingCarrier: 'BA', cabin: 'economy', departureAirport: 'LHR', arrivalAirport: 'JFK' },
@@ -194,45 +198,50 @@ describe('LHR', () => {
     );
 
     assert.equal(r.status?.allianceTier, 'oneworld_emerald');
-    find(r.lounges, 'British Airways Concorde Room').access.status === 'allowed'
-      || assert.fail('Concorde Room pitää olla allowed (BA carrier + emerald)');
-    find(r.lounges, 'British Airways Galleries Club Lounge').access.status === 'allowed'
-      || assert.fail('Galleries Club pitää olla allowed');
-
-    // Käytetään assert.equal jotta virheviesti on selkeä
-    assert.equal(find(r.lounges, 'British Airways Concorde Room').access.status,       'allowed');
+    // Emerald status alone no longer opens Concorde Room in economy/business
+    assert.notEqual(find(r.lounges, 'British Airways Concorde Room').access.status, 'allowed',
+      'Concorde Room ei saa olla allowed pelkällä emerald-statuksella ilman First-lippua');
+    // Galleries Club stays all_alliance oneworld_sapphire → Emerald qualifies
     assert.equal(find(r.lounges, 'British Airways Galleries Club Lounge').access.status, 'allowed');
   });
 
-  test('AY Gold + BA-lento LHR → Concorde denied (BA/IB vain), Galleries allowed', () => {
+  test('BA Gold + BA-lento + First → Concorde Room allowed (cabin gate satisfied)', () => {
     const r = findEntitlementsAtAirport(
-      { statusCards: [{ programCode: 'ay-plus', tierName: 'Gold' }] },
-      { operatingCarrier: 'BA', cabin: 'economy', departureAirport: 'LHR', arrivalAirport: 'HEL' },
+      { statusCards: [{ programCode: 'ba-exec-club', tierName: 'Gold' }] },
+      { operatingCarrier: 'BA', cabin: 'first', departureAirport: 'LHR', arrivalAirport: 'JFK' },
       repos, { now: OPEN },
     );
 
-    // Concorde: carrier_specific, restriction=['BA','IB']. Operating=BA → allowed!
-    // Tämä on tärkeä: restriction = operating carrier, ei status-kortin carrier.
-    assert.equal(find(r.lounges, 'British Airways Concorde Room').access.status,
-      'denied',  // AY Gold on vain sapphire — emerald vaaditaan
-    );
+    assert.equal(find(r.lounges, 'British Airways Concorde Room').access.status, 'allowed',
+      'BA First-lipulla Concorde Room aukeaa (status ei enää portteri)');
     assert.equal(find(r.lounges, 'British Airways Galleries Club Lounge').access.status, 'allowed');
   });
 
-  test('AY Platinum + BA-lento LHR → Concorde denied (AY ei BA/IB), Galleries allowed', () => {
-    // Vaikka AY Platinum on emerald, Concorde Room vaatii carrier BA tai IB
-    // Mutta operating carrier on BA → restriction täyttyy!
-    // Tämä testi varmistaa: restriction tarkistaa OPERATING CARRIERIN, ei statuskorttiyhtiötä.
+  test('AY Platinum + BA-lento + Business → Concorde Room denied (user field report: emerald+Business ≠ pääsy)', () => {
+    // Käyttäjän vahvistama tapaus: oneworld Emerald + BA Business = ei pääsy.
+    // Aiemmin väärin tässä testissä: 'allowed'. Nyt cabin=first vaaditaan.
     const r = findEntitlementsAtAirport(
       { statusCards: [{ programCode: 'ay-plus', tierName: 'Platinum' }] },
-      { operatingCarrier: 'BA', cabin: 'economy', departureAirport: 'LHR', arrivalAirport: 'HEL' },
+      { operatingCarrier: 'BA', cabin: 'business', departureAirport: 'LHR', arrivalAirport: 'HEL' },
       repos, { now: OPEN },
     );
 
-    // Operating carrier = BA, restriction ['BA','IB'] → täsmää → tarkistetaan tier
-    // AY Platinum = emerald, vaatimus = emerald → allowed!
-    assert.equal(find(r.lounges, 'British Airways Concorde Room').access.status, 'allowed',
-      'Operating carrier BA täsmää restrictiooniin; AY Platinum = emerald OK');
+    assert.notEqual(find(r.lounges, 'British Airways Concorde Room').access.status, 'allowed',
+      'Concorde Room ei saa olla allowed emerald + Business -yhdistelmällä');
+    // Galleries Club (all_alliance oneworld_sapphire) toimii
+    assert.equal(find(r.lounges, 'British Airways Galleries Club Lounge').access.status, 'allowed');
+  });
+
+  test('AY Platinum + AY-lento + First → Concorde Room NOT allowed (carrier gate — AY ei BA/IB)', () => {
+    // Regressiotesti: vaikka First-lippu ja emerald, Concorde Room on vain BA/IB-operoidut.
+    const r = findEntitlementsAtAirport(
+      { statusCards: [{ programCode: 'ay-plus', tierName: 'Platinum' }] },
+      { operatingCarrier: 'AY', cabin: 'first', departureAirport: 'LHR', arrivalAirport: 'HEL' },
+      repos, { now: OPEN },
+    );
+
+    assert.notEqual(find(r.lounges, 'British Airways Concorde Room').access.status, 'allowed',
+      'AY-operoidulla lennolla Concorde Room ei aukea vaikka olisi First');
   });
 });
 
