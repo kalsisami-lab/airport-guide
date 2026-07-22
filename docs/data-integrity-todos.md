@@ -770,3 +770,106 @@ to Italian regional airports (need audit).
 
 Track together with §39b (JTR/KGS/CHQ PP-only lounges) — the two form a
 natural PP-only batch across leisure destinations.
+
+---
+
+## 43. Baltic + Central European lounge opening hours unknown (Phase 29)
+
+**Risk:** Airport operator sites in the Baltics + CE region
+(tallinn-airport.ee, riga-airport.com, vno.lt, lotnisko-chopina.pl,
+budapestairport.com, prg.aero, lju-airport.si) do not publish per-lounge
+opening hours reliably. All 15 Phase 29 lounges seeded with
+`opening_hours = NULL`:
+  - TLL (63), RIX (64), VNO (65)
+  - WAW Etiuda (66), Fantazja (67), Preludium (68)
+  - KRK (69), GDN (70)
+  - PRG Erste Premier (71), Mastercard (72)
+  - BUD SkyCourt (73), Platinum NS (74), Platinum Schengen (75), Plaza Premium NS (76)
+  - LJU (77)
+
+Same shape as §35 / §38 / §40. Cumulative lounges with unknown hours
+across all four phases: 40 lounges (§35 six + §38 six + §40 thirteen +
+§43 fifteen).
+
+**Action needed:** Batch verification pass across all four sections at
+once — same source list (LoungePair + PP app), same UPDATE shape. Worth
+scripting as a single audit rather than per-phase.
+
+---
+
+## 44. PRG Menzies Aviation Lounge — temporarily closed
+
+**Risk:** Menzies Aviation Lounge at PRG Terminal 2 (oneworld carrier
+list: IB) is temporarily closed as of Phase 29 seeding. Not added.
+Once reopened, an IB Sapphire passenger would gain a `allowed` path
+that they currently do not have at PRG (Erste Premier is [AY,IB] but
+they'd still route there via IB match — so the closure has no user-
+visible impact today, only reduces choice).
+
+**Action needed:** Watch prg.aero and PP app for reopening. Seed as a
+new lounge at airport_id for PRG with the standard Greek/CE channel
+set once confirmed. Same shape as §39a (RHO Skyserv).
+
+---
+
+## 45. Terminal-specific lounge filtering — engine gap
+
+**Risk:** `lounges.terminal_id` exists in the schema and can point to a
+row in the `terminals` table, but the current seeded state uses
+`terminal_id = NULL` for every lounge from Phase 22 onward. The engine
+accepts a `passengerTerminalId` EvalOption but has no code path that
+filters lounges when both are set. Result: a passenger in PRG T1
+sees both Erste Premier (T2) and Mastercard (T1) as `allowed` even
+though they'd need to change terminals to reach Erste Premier.
+
+Same issue affects (retroactively):
+  - ARN Pearl T2 (28) vs Pearl C37 (29) — Terminal 2 vs Terminal 4
+  - Phase 28 lounges with terminal notes in `location_description`
+  - Phase 29 PRG Erste Premier (T2) + Mastercard (T1) — this batch's
+    added case
+
+**Action needed:** Two-step. (1) Add `passengerTerminalId` filter in
+`lib/engine/evaluateLoungeAccess.ts`: if both `passenger.terminalId`
+and `lounge.terminalId` are set and different, return
+`physically_unreachable` with reason "different terminal". (2)
+Backfill `terminal_id` on affected lounges via a migration keyed by
+the terminals table (needs airport terminals seeded first — currently
+none seeded in most airports).
+
+Low priority — most users have IATA + no terminal in their query, so
+`passengerTerminalId` is unset and the filter is a no-op.
+
+---
+
+## 46. Alliance-status confidence — direct vs §36-derived (adopted Phase 29)
+
+**Standard (new in Phase 29, applies going forward):**
+
+`alliance_status` rule `confidence` values:
+  - **0.99** — carrier list matches the oneworld.com per-airport
+             snapshot as-is at seeding time (direct listing).
+  - **0.95** — carrier list is §36-derived: AY was added to the list
+             because oneworld.com's seasonal snapshot omitted AY, and
+             the airport is on Finnair's route network.
+
+The 0.04 delta reflects that a rule-derived list is one step removed
+from a primary-source verification. It is not (today) surfaced in the
+UI — both fall inside the "high confidence" bucket. It is useful for
+logging and for prioritizing re-verification passes (all 0.95 rules
+should be re-checked when a winter snapshot becomes available).
+
+**Not retro-applied.** Phase 26 (Spain), 27 (Greece), and 28 (Portugal +
+Italy) seeded uniformly at 0.95 regardless of whether the source was
+direct or §36-derived. Their alliance_status rules stay at 0.95. If the
+distinction ever becomes UI-relevant, backfill those phases in one pass
+by re-consulting the seeding rationale in each patch script's header
+comment.
+
+**Statistics as of Phase 29:**
+  - Direct (0.99): 10 lounges
+  - §36-derived (0.95): 5 lounges
+  - Phase 26–28 legacy 0.95: 32 lounges
+
+**Action needed:** None — this is a rule statement, not a data gap.
+Reference from future batches when picking the alliance_status
+confidence value.
