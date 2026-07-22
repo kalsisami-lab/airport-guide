@@ -873,3 +873,81 @@ comment.
 **Action needed:** None — this is a rule statement, not a data gap.
 Reference from future batches when picking the alliance_status
 confidence value.
+
+---
+
+## 47. Ryhmä-classification rule for lounge seeding (adopted Phase 30)
+
+**Standard (new in Phase 30, applies to all future lounge seeding):**
+
+Every lounge encountered during data collection falls into one of four
+seeding shapes. The shape determines the channel structure and how §36
+applies:
+
+### Ryhmä 1 — Third-party operator lounge
+- Operator hosts multiple oneworld carriers under contract (Aena Sala
+  VIP, Goldair Handling, Skyserv, Aspire, Plaza Premium, Marhaba,
+  Primeclass, "oneworld Lounge" branded, ANA Aeroportos, etc.)
+- Seed shape: `carrier_specific` alliance_status channel with the
+  listed carriers + PP/LK/DP + walk-in paid.
+- §36 applies: add AY to carrier list if the airport is on Finnair's
+  route network (confidence 0.95 for the alliance_status rule).
+- Example phases: 26, 27, 28, 29.
+
+### Ryhmä 2 — Airline-branded oneworld lounge
+- Operated by a oneworld member airline as their brand (Cathay Pacific
+  Lounge, American Airlines Admirals Club, AA Flagship Lounge, BA
+  Lounge, JAL Sakura Lounge, Qantas Lounge, Alaska Lounge, Oman Air
+  First & Business Class Lounge, Qatar Al Safwa / Al Mourjan).
+- Seed shape: `all_alliance` alliance_status channel, sapphire+, NO
+  carrier_restriction, confidence 0.99. No PP/paid channels (airline-
+  brand lounges are not on PP network and don't do walk-in).
+- §36 does NOT apply — the model doesn't use a carrier list.
+- Access rule: any oneworld Sapphire+ pax on any oneworld-operated
+  flight is `allowed`. Star Alliance / SkyTeam pax → `not_applicable`
+  with reason "This is a oneworld lounge; your flight is on a
+  different alliance carrier".
+- Same shape as Phase 21 §17 fix (HEL Finnair Lounge).
+- Introduced Phase 30.
+
+### Ryhmä 3 — AMBIG contract lounge
+- Operated by a NON-oneworld airline (SkyTeam Air France/KLM, former
+  Star SAA, SkyTeam China Eastern, ex-oneworld Aer Lingus) that has a
+  fixed contract to serve specific oneworld carrier(s).
+- Seed shape: `carrier_specific` with the listed carriers verbatim,
+  confidence 0.95 (contract-derived not snapshot-derived).
+- §36 does NOT apply — the list is authoritative, not seasonal.
+- Access rule: only pax on the listed carrier(s) qualify; others fall
+  through to fallback (no walk-in either — contract lounges don't offer
+  paid entry).
+- Population: 7 lounges (CDG AF, DUB EI, FRA AF/KLM, MUC AF KLM, PVG
+  SAA, PVG China Eastern x2).
+
+### Ryhmä 4 — PP-only, no oneworld presence
+- Airport has no oneworld lounge on oneworld.com, but a PP/LK/DP
+  network lounge may exist (Aspire, Plaza Premium, small regional).
+- Seed shape: PP + LK + DP + paid channels, no alliance_status.
+- Example: AGP Sala VIP (Phase 23).
+- Population as of Phase 30 scrape: 6 airports (BIQ, BOO, GZP, KKN,
+  TOS, TRD).
+
+### Classification rule (for future batches)
+
+Given a lounge name from oneworld.com's per-airport listing:
+
+  1. If the name contains a NON-oneworld airline brand token
+     (Aer Lingus, Air France, KLM, China Eastern, SAA, Hawaiian) →
+     Ryhmä 3.
+  2. Else if the name contains a oneworld member airline brand token
+     (American Airlines / Admirals Club / Flagship Lounge, British
+     Airways, Cathay Pacific, Finnair, Iberia, Japan Airlines /
+     Sakura, Malaysia Airlines, Qantas, Qatar Airways / Al Safwa /
+     Al Mourjan, Royal Air Maroc, Royal Jordanian, SriLankan, Alaska
+     Lounge, Fiji Airways, Oman Air) → Ryhmä 2.
+  3. Else → Ryhmä 1 (third-party operator).
+  4. If the airport has NO lounge on oneworld.com but has a PP-network
+     lounge elsewhere → Ryhmä 4.
+
+**Action needed:** None — this is a rule statement. Encoded in
+`scripts/classify-lounges.ts` as a check-and-report utility. Run before
+each new seeding batch to see the shape counts and any AMBIG cases.
