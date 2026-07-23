@@ -1087,3 +1087,59 @@ closed" as of UK batch seeding (2026-07). Not seeded. Same shape as
 **Action needed:** Watch oneworld.com/airport-lounge-results?location=EDI
 for reopening. Seed as Ryhmä 1 (standard 5-channel model, carrier list
 per snapshot + §36 AY-lisäys if AY missing) under airport_id for EDI.
+
+---
+
+## 56. Program-specific tier access not modelable (adopted DOH audit)
+
+**Risk:** oneworld.com lists some lounge access rules that reference
+airline-program-specific tier names beyond the oneworld_ruby /
+oneworld_sapphire / oneworld_emerald abstraction. Examples:
+
+  - **DOH Al Safwa First Lounge** — "QR First Class ticket OR Business
+    class ticket with **Privilege Club Platinum**" (QR's top status, ≈
+    oneworld_emerald but NOT a synonym — Privilege Club has 4 tiers
+    against oneworld's 3).
+  - **LHR BA Concorde Room** — "First Class ticket OR **BA Executive
+    Club Gold Guest List** OR **AA Concierge Key**" (both invitation-
+    only tiers above regular Emerald).
+  - **JFK AA Flagship First Dining** (not currently seeded) — Concierge
+    Key or 3-class F ticket.
+
+Engine models `AllianceTier` as a fixed enum of 8 values (oneworld ×3 +
+star ×2 + skyteam ×2 + none). It cannot express "Privilege Club
+Platinum" or "Gold Guest List" as distinct grades.
+
+**Modeling choice for Al Safwa (DOH audit, this batch):**
+The lounge is migrated to Concorde Room -style `airline_own [QR] +
+conditions cabin='first'`, dropping the alternative "Business + Privilege
+Club Platinum" path. This is deliberately CONSERVATIVE:
+  - Prevents false positives (previously the model let any oneworld
+    Emerald pax in on Business — wrong per audit)
+  - Introduces false negatives: a genuine QR Privilege Club Platinum
+    holder on a QR Business ticket is denied by the model, but would be
+    admitted at the door.
+
+**Action needed:** Long-term, the engine could grow either:
+  (a) A per-airline `program_tier` field on `StatusContext` plus a
+      condition operator like `{ op: 'program_tier_at_least',
+      program: 'QR:PrivilegeClub', tier: 'Platinum' }`. Adds schema
+      surface but stays declarative.
+  (b) An `additional_requirement` exception on the lounge that a UI
+      layer can surface as a "not fully modeled — check with staff"
+      warning without gating engine output.
+
+Neither is required for MVP. Same rationale as §54 (arrivals lounges):
+the affected user population is small and the false-negative direction
+is the safer error.
+
+**Related model-audit results (§52 audit of DOH, 2026-07-23):**
+  - DOH Al Safwa First Lounge — MIGRATED to airline_own + cabin=first
+    per this section. Was: all_alliance + oneworld_emerald. Reason:
+    data reads "First Class" without "Emerald Tier" line, QR-only.
+  - DOH Qatar Airways Platinum Lounge - South — MODEL UNCHANGED
+    (all_alliance + oneworld_emerald is correct per §52 OR-model;
+    data lists "First Class" AND "Emerald Tier" separately + "ANY
+    oneworld"). Added missing paid channel (Sapphire/Ruby purchasable
+    access, oneworld_ruby minimum) — same Silver-gated shape as Phase
+    21b HEL Finnair Lounge.
