@@ -1400,3 +1400,28 @@ confidence 1.0. Now shows "?" chip = "we don't have data".
     data becomes available. Own project. Current coverage 5/90 (5.6 %).
   - If a user reports "showed fast track as unknown but I know I qualify",
     the fix is to seed the missing rule, not tweak engine semantics.
+
+**Post-fix carrier-restriction audit (2026-07):** 4 service rules had
+non-empty `carrier_restriction` at time of §63 fix. Two paths:
+
+  - **LHR id=4 fast_track_security + id=11 priority_boarding** — both
+    were `[BA, IB]` only. oneworld.com says fast track/priority_boarding
+    is a oneworld benefit available at Terminal 3 & 5. T5 = BA (covered),
+    T3 = AA, CX, QF, JL, QR (previously excluded → misleading "?" chip
+    for those pax). Expanded to `[BA, IB, AA, CX, QF, JL, QR]` with
+    `notes = "Terminal 3 and Terminal 5 only"` for both rules
+    (patch-lhr-services-carrier-expansion.ts).
+
+  - **DXB id=7 fast_track_security `[EK]`** — NOT touched in the audit.
+    EK is not a oneworld member; the [EK] restriction likely models
+    Emirates' own fast track (their airline benefit for EK's own pax).
+    Given §63 semantics, non-EK pax now correctly see "?" (not "✗").
+    **Data verification needed:** does DXB have a SEPARATE oneworld fast
+    track lane (e.g. T3 for oneworld carriers) that's not modeled?
+    If yes, add a second rule with the oneworld carrier list. If not,
+    the [EK] rule is correct.
+
+  - **HEL id=12 `[AY]`** — narrow Finnair Silver + AY-flight rule. HEL
+    has 7 other rules covering broader eligibility paths, so this
+    narrow rule doesn't misrepresent — it's a specific benefit for a
+    specific case. No change.
