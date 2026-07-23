@@ -188,25 +188,39 @@ column later when a user reports a false positive.
 
 **Option C for the initial 85-airport backfill.** Rationale:
 
-1. **Coverage gain > precision gap.** 85 airports with fast track
-   modeled (even imprecisely) is a massive UX improvement over 85
-   airports returning `not_enough_info`. Terminal precision is
-   already imperfect in reality (terminal assignments change per
-   flight).
+1. **Coverage gain > precision gap.** Airports with fast track modeled
+   (even imprecisely) is a UX improvement over airports returning
+   `not_enough_info`. Terminal precision is already imperfect in
+   reality (terminal assignments change per flight).
 
 2. **UI signal missing anyway.** To use option A or B we'd need the
    user to input their terminal, which the current Dashboard doesn't
    ask for. Adding a terminal field to the UI is a separate design
    decision.
 
-3. **False positive is recoverable.** If a user shows up at ARN T4 and
-   sees "fast track available" when it's really only at T5, they'll
-   figure it out at the airport. If we said `not_enough_info` they
-   might miss a real benefit.
+3. **Schema addition is non-breaking.** `terminal_restriction` is an
+   additive column — nothing has to change in existing rules or code
+   paths for it to land later. Absent-column semantics ("any terminal")
+   is preserved forever for old rows. This makes deferring the column
+   a strictly reversible decision: seed now, refine later.
 
-4. **Migration cheap when needed.** Adding `terminal_restriction`
-   later is a non-breaking column addition. Rules seeded now can be
-   retro-fitted.
+4. **Existing `notes` field preserves the source info.** Terminal
+   context ("Fast track available T3 & T5 only") is captured in
+   `notes` as human-readable text and shown to the UI. When the
+   column lands, the extraction path is `notes → terminal_restriction`.
+   No data is lost by deferring.
+
+**Not a rationale (deliberately):** the trade-off between false positive
+("said fast track available, but I was at wrong terminal") vs. false
+negative ("said not available, but I was in a terminal where it was")
+is NOT the argument here. Per §56 and §60, in this app's context the
+false positive is the more expensive direction — the user changes
+queues to a fast lane, is refused, and has to walk back (visible
+inconvenience) — whereas the false negative just means asking at the
+counter. Terminal-agnostic rules skew toward false positives, so
+Option C is a precision debt we're taking on knowingly. The reason we
+accept it is #3 (cheap, reversible migration), not that the false
+positive is somehow fine.
 
 Log terminal info in `notes` field for all rules seeded during
 backfill, even if engine can't filter by it. Then upgrade path is:
@@ -262,6 +276,72 @@ airport specifics):
 Notes: capture terminal info even though engine won't filter. Priority:
 alliance_defined tier rules first (high signal), then cabin (mid), then
 cards (low but often applies), then paid (fallback).
+
+### Mandatory precondition: source verification
+
+Rules 1–3 (alliance_defined tier gates) may **only** be seeded for
+an airport that has a **primary-source-verified** fast track offering
+for that alliance. Same threshold as `alliance_defined` semantics
+(§64): if we mark it as authoritative, we must have evidence that
+authority holds at this airport.
+
+Acceptable primary sources:
+
+- Airport's own website page listing "Fast Track" or a named priority
+  lane, referenced in `source_url`.
+- Alliance benefit page (oneworld.com/star-alliance/skyteam) declaring
+  the tier benefit is available AND naming the airport (or the airline
+  hub that implies operation there).
+- First-hand user field report with airport + terminal + carrier + tier.
+
+**Not acceptable:**
+
+- "Alliance policy says Sapphire+ gets fast track" as a global rule
+  without airport-specific confirmation — many airports don't operate
+  a fast lane at all, or don't extend the alliance benefit
+  reciprocally.
+- Assumption based on "airport X is served by carrier Y, so Y's
+  benefits must apply" — some outstation airports have zero priority
+  infrastructure.
+
+**Without primary-source verification, the airport stays in
+`not_enough_info` (?) for that service.** Seeding rules 4–6 (cabin,
+cards, paid) is also gated on verification of that specific path —
+e.g., a card provider rule requires evidence that the specific card is
+accepted at that specific airport.
+
+### Recording provenance per rule
+
+Every backfilled rule row **must** populate:
+
+- `source_url` — URL to the primary source that verifies this rule.
+  If the source is a user field report, use a stable URL that reflects
+  the context (e.g., a permanent report note or issue reference); do
+  not leave blank.
+- `verified_at` — ISO date (`YYYY-MM-DD`) of the verification. For
+  scraped data, the scrape date. For user field reports, the trip
+  date. For airport-website content, the date the page was last
+  checked.
+
+Rules without both fields set are considered unverified and should be
+reviewed (or migrated back to `not_enough_info` for that service). A
+future audit script can flag `source_url IS NULL OR verified_at IS
+NULL` rows.
+
+**Example rule with full provenance:**
+
+```typescript
+{
+  service_type: 'fast_track_security',
+  airport_id: <ARN>,
+  min_alliance_tier: 'star_gold',
+  tier_semantics: 'alliance_defined',
+  notes: 'Star Priority Lane, Terminal 5. Star Alliance Gold benefit.',
+  source_url: 'https://www.swedavia.com/arlanda/services/fast-track/',
+  verified_at: '2026-07-23',
+  confidence: 0.95,
+}
+```
 
 ## Follow-up work (out of scope for backfill)
 
