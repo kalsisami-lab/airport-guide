@@ -57,13 +57,14 @@ function makeRule(overrides: Partial<AirportServiceRuleInput> = {}): AirportServ
 // ─── 1–3: Tarjonta ────────────────────────────────────────────────────────────
 
 describe('Tarjonta', () => {
-  test('1. Ei sääntöjä → not_offered_at_airport', () => {
+  test('1. Ei sääntöjä → not_enough_info (§63: silence ≠ certainty; 85/90 airports unseeded)', () => {
     const r = evaluateAirportService(makePassenger(), makeStatus(), 'fast_track_security', [], NOW);
-    assert.equal(r.status, 'not_offered_at_airport');
+    assert.equal(r.status, 'not_enough_info');
+    assert.equal(r.confidence, 0.0);
     assert.ok(r.reason.length > 0);
   });
 
-  test('2. Säännöt olemassa → arvioidaan normaalisti (ei not_offered)', () => {
+  test('2. Säännöt olemassa → arvioidaan normaalisti (ei not_enough_info fallthrough)', () => {
     const r = evaluateAirportService(
       makePassenger(),
       makeStatus({ allianceTier: 'oneworld_sapphire' }),
@@ -71,7 +72,8 @@ describe('Tarjonta', () => {
       [makeRule({ minAllianceTier: 'oneworld_sapphire' })],
       NOW,
     );
-    assert.notEqual(r.status, 'not_offered_at_airport');
+    // Should be allowed (rule matches)
+    assert.equal(r.status, 'allowed');
   });
 
   test('3. findAirportServices palauttaa kaikki neljä palvelua', () => {
@@ -154,18 +156,20 @@ describe('Status-pohjainen pääsy', () => {
     }
   });
 
-  test('8. AY Gold (sapphire) + fast_track requires emerald → denied, boarding/baggage allowed', () => {
+  test('8. AY Gold (sapphire) + fast_track requires emerald → not_enough_info (§63: rule doesn\'t match ≠ explicit denial), boarding/baggage allowed', () => {
     const pax    = makePassenger();
     const status = makeStatus({ allianceTier: 'oneworld_sapphire', fastTrack: true });
 
     const result = findAirportServices(pax, status, 'HEL', {
-      fast_track_security: [makeRule({ minAllianceTier: 'oneworld_emerald' })], // sapphire nie riitä
+      fast_track_security: [makeRule({ minAllianceTier: 'oneworld_emerald' })], // sapphire ei riitä — rule silent about sapphire, not denying
       priority_checkin:    [makeRule({ minAllianceTier: 'oneworld_sapphire' })],
       priority_boarding:   [makeRule({ minAllianceTier: 'oneworld_sapphire' })],
       priority_baggage:    [makeRule({ minAllianceTier: 'oneworld_sapphire' })],
     }, NOW);
 
-    assert.equal(result.services.fast_track_security.status, 'denied');
+    // §63: a rule requiring emerald doesn't DENY sapphire pax; it's silent about them.
+    // Airport may still have other paths (Amex cards, cabin, etc.) we haven't modeled.
+    assert.equal(result.services.fast_track_security.status, 'not_enough_info');
     assert.equal(result.services.priority_boarding.status, 'allowed');
     assert.equal(result.services.priority_baggage.status, 'allowed');
   });
@@ -204,10 +208,10 @@ describe('Status-pohjainen pääsy', () => {
     }
   });
 
-  test('11. LH Senator + U2 STN (alliance=null) → kaikki denied', () => {
+  test('11. LH Senator + U2 STN (alliance=null) → kaikki not_enough_info (§63: rule silent, not deny)', () => {
     const pax    = makePassenger({ operatingCarrier: 'U2', operatingAlliance: null });
     const status = makeStatus({ allianceTier: 'star_gold', fastTrack: true });
-    const rule   = makeRule({ minAllianceTier: 'star_gold' }); // alliance check blocks null
+    const rule   = makeRule({ minAllianceTier: 'star_gold' }); // alliance check blocks null alliance flight
 
     const result = findAirportServices(pax, status, 'STN', {
       fast_track_security: [rule],
@@ -216,8 +220,10 @@ describe('Status-pohjainen pääsy', () => {
       priority_baggage:    [rule],
     }, NOW);
 
+    // §63: a star_gold rule doesn't explicitly deny null-alliance pax — it's silent about them.
+    // STN may offer fast track via other paths (Amex, cabin) we haven't modeled.
     for (const [svc, res] of Object.entries(result.services)) {
-      assert.equal(res.status, 'denied', `${svc} should be denied for null-alliance flight`);
+      assert.equal(res.status, 'not_enough_info', `${svc} should be not_enough_info for null-alliance flight (rule silent)`);
     }
   });
 });
@@ -271,29 +277,32 @@ describe('Lippuluokka', () => {
     }
   });
 
-  test('15. Business-luokka + Star Gold Track sääntö vaatii star_gold → ei cabin-perusteella', () => {
+  test('15. Business-luokka + Star Gold Track sääntö vaatii star_gold → not_enough_info (§63: rule silent about non-Gold cabin-only pax)', () => {
     const pax = makePassenger({
       cabin: 'business', operatingCarrier: 'LH', operatingAlliance: 'star_alliance',
     });
     const goldTrackRule = makeRule({
       minAllianceTier: 'star_gold', provider: 'star_alliance_gold_track',
     });
-    // Business class without star_gold status → denied
+    // §63: star_gold rule doesn't DENY non-gold business pax; separate cabin-only rule
+    // (if seeded) would grant access. Silence, not denial.
     const r = evaluateAirportService(pax, null, 'fast_track_security', [goldTrackRule], NOW);
-    assert.equal(r.status, 'denied');
+    assert.equal(r.status, 'not_enough_info');
   });
 });
 
 // ─── 16: Allianssiraja ────────────────────────────────────────────────────────
 
 describe('Allianssiraja', () => {
-  test('16. star_gold + oneworld-lento + oneworld-sääntö → denied (eri alianssi)', () => {
+  test('16. star_gold + oneworld-lento + oneworld-sääntö → not_enough_info (§63: rule silent about wrong-alliance status)', () => {
     const pax    = makePassenger({ operatingCarrier: 'BA', operatingAlliance: 'oneworld' });
     const status = makeStatus({ allianceTier: 'star_gold', fastTrack: true });
-    const rule   = makeRule({ minAllianceTier: 'oneworld_sapphire' }); // oneworld vaatimus
+    const rule   = makeRule({ minAllianceTier: 'oneworld_sapphire' }); // oneworld vaatimus, pax on Star
 
     const r = evaluateAirportService(pax, status, 'fast_track_security', [rule], NOW);
-    assert.equal(r.status, 'denied', 'star_gold cannot satisfy oneworld_sapphire');
+    // §63: oneworld_sapphire rule doesn't deny star_gold pax; airport may have separate
+    // star_gold rules (unmodeled) or the pax may qualify via cards.
+    assert.equal(r.status, 'not_enough_info', 'star_gold rule miss ≠ explicit deny; other paths may exist');
   });
 });
 
@@ -366,13 +375,13 @@ describe('Aggregointi (findAirportServices)', () => {
     }
   });
 
-  test('21. Sekamatkustaja: yksi allowed, kolme denied → selkeä palautus', () => {
+  test('21. Sekamatkustaja: yksi allowed, kolme not_enough_info (§63: rules don\'t match ≠ deny)', () => {
     const result = findAirportServices(
       makePassenger(),
       makeStatus({ allianceTier: 'oneworld_sapphire', fastTrack: true }),
       'HEL',
       {
-        fast_track_security: [makeRule({ minAllianceTier: 'oneworld_emerald' })], // sapphire ei riitä
+        fast_track_security: [makeRule({ minAllianceTier: 'oneworld_emerald' })], // sapphire ei riitä — rule silent
         priority_checkin:    [makeRule({ minAllianceTier: 'oneworld_emerald' })],
         priority_boarding:   [makeRule({ minAllianceTier: 'oneworld_sapphire' })], // riittää
         priority_baggage:    [makeRule({ minAllianceTier: 'oneworld_emerald' })],
@@ -381,29 +390,31 @@ describe('Aggregointi (findAirportServices)', () => {
     );
 
     assert.equal(result.services.priority_boarding.status, 'allowed');
-    assert.equal(result.services.fast_track_security.status, 'denied');
-    assert.equal(result.services.priority_checkin.status, 'denied');
-    assert.equal(result.services.priority_baggage.status, 'denied');
+    // §63: emerald-only rule doesn't DENY sapphire pax — it's silent about them
+    assert.equal(result.services.fast_track_security.status, 'not_enough_info');
+    assert.equal(result.services.priority_checkin.status, 'not_enough_info');
+    assert.equal(result.services.priority_baggage.status, 'not_enough_info');
   });
 
-  test('22. Kenttä jossa vain kaksi palvelua → kaksi allowed/denied + kaksi not_offered', () => {
+  test('22. Kenttä jossa vain kaksi palvelua → kaksi allowed/muut + kaksi not_enough_info (§63)', () => {
     const result = findAirportServices(
       makePassenger(),
       makeStatus({ allianceTier: 'oneworld_sapphire', fastTrack: true }),
       'JFK',
       {
-        fast_track_security: [],              // ei tarjolla
-        priority_checkin:    [],              // ei tarjolla
-        priority_boarding:   [makeRule()],    // tarjolla
-        priority_baggage:    [makeRule()],    // tarjolla
+        fast_track_security: [],              // ei sääntöjä — not enough info, ei "not offered"
+        priority_checkin:    [],              // sama
+        priority_boarding:   [makeRule()],    // sääntö olemassa, matchaa
+        priority_baggage:    [makeRule()],    // sama
       },
       NOW,
     );
 
-    assert.equal(result.services.fast_track_security.status, 'not_offered_at_airport');
-    assert.equal(result.services.priority_checkin.status, 'not_offered_at_airport');
-    assert.notEqual(result.services.priority_boarding.status, 'not_offered_at_airport');
-    assert.notEqual(result.services.priority_baggage.status, 'not_offered_at_airport');
+    // §63: empty rules → we don't know, not "definitively not offered"
+    assert.equal(result.services.fast_track_security.status, 'not_enough_info');
+    assert.equal(result.services.priority_checkin.status, 'not_enough_info');
+    assert.notEqual(result.services.priority_boarding.status, 'not_enough_info');
+    assert.notEqual(result.services.priority_baggage.status, 'not_enough_info');
   });
 });
 
@@ -424,7 +435,8 @@ describe('Yhteensopivuus ja determinismi', () => {
     const r2 = evaluateAirportService(paxOther,   status, 'fast_track_security', [rule], NOW);
 
     assert.equal(r1.status, 'allowed',  'same_day_departure=true matches');
-    assert.equal(r2.status, 'denied', 'same_day_departure=false blocks');
+    // §63: conditions predicate failing ≠ explicit deny; rule silent about other-day pax
+    assert.equal(r2.status, 'not_enough_info', 'same_day_departure=false — rule silent, not denial');
   });
 
   test('24. AccessStatus-laajennukset eivät riko lounge-sorttausta', () => {

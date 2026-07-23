@@ -1347,3 +1347,56 @@ denied, Emerald allowed) preserve this distinction.
 
 **Action needed:** None — modeled correctly. Update §56 if a fourth
 case emerges (AA Flagship First Dining or similar).
+
+---
+
+## 63. Airport services default semantics — silence ≠ certainty
+
+**Risk (fixed):** `evaluateAirportService.ts` previously conflated two
+different states of ignorance with confident statements:
+
+  - **No rules seeded for this service at this airport** → returned
+    `not_offered_at_airport` with confidence 1.0. But 85 of 90 seeded
+    airports had no fast track rules at all. Many of the unseeded ones
+    (ARN, AMS, CPH, MUC, ZRH, MAN, BCN, HKG, SIN, DOH, ...) actually
+    DO offer fast track in reality. Reporting "not offered" with
+    confidence 1.0 was actively misleading. UI chip = "—" ("Not offered")
+    was shown as a confident negative fact.
+
+  - **Rules exist but no rule matches this passenger** → returned
+    `denied` with confidence 0.95. But rules describe positive access
+    paths, not exhaustive coverage. A rule requiring emerald doesn't
+    DENY a sapphire pax — it's silent about them. The airport may
+    still grant access via Amex/card providers, cabin, or other paths
+    we haven't modeled. UI chip = "✗" ("Denied") was shown as an
+    explicit deny when the reality was "we don't have a rule that
+    covers this case".
+
+Both were the same design flaw: engine treating silence as certainty.
+
+**Fix:** Both default paths now return `not_enough_info` with
+confidence 0.0. UI chip becomes "?" — honest signal that the engine
+doesn't know. Only two paths still produce confident negatives:
+
+  - `action='deny'` rule matches → `denied` (explicit deny rule fired)
+  - `not_applicable` (e.g., departure time already passed)
+
+Field-verified: user's ARN observation motivated this fix. ARN (and
+84 other airports) previously showed "Fast Track: Not offered" with
+confidence 1.0. Now shows "?" chip = "we don't have data".
+
+**Impact:**
+  - `not_offered_at_airport` status value retained in the enum for
+    future use (e.g., seeding "airport confirmed to have no fast
+    track"). Currently no rule uses it.
+  - LHR `denied` case (rule [BA,IB] + AY-flight → previously "Denied"
+    chip) now returns `not_enough_info` — much more accurate given LHR
+    actually offers fast track for AY oneworld Sapphire pax on T3/T5.
+    Whether to further expand the LHR carrier list is a separate
+    tactical decision (not required for correctness).
+
+**Action needed:**
+  - Backfill fast track / priority_boarding rules to more airports as
+    data becomes available. Own project. Current coverage 5/90 (5.6 %).
+  - If a user reports "showed fast track as unknown but I know I qualify",
+    the fix is to seed the missing rule, not tweak engine semantics.

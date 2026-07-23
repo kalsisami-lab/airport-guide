@@ -94,12 +94,17 @@ export function evaluateAirportService(
     };
   }
 
-  // 2. not_offered_at_airport: no rules defined for this service
+  // 2. not_enough_info: no rules seeded for this service at this airport.
+  //    Do NOT claim the service is "not offered" — most airports simply have
+  //    incomplete data. Only ~5 of 90+ seeded airports have any service rules,
+  //    yet many of the unseeded ones (ARN, AMS, CPH, ...) do offer fast track
+  //    in reality. Reporting "not offered" with confidence 1.0 was actively
+  //    misleading. Silence ≠ certainty. See §63.
   if (rules.length === 0) {
     return {
-      status:        'not_offered_at_airport',
-      confidence:    1.0,
-      reason:        `${serviceType} is not offered at this airport`,
+      status:        'not_enough_info',
+      confidence:    0.0,
+      reason:        `No ${serviceType} rules seeded for this airport`,
       guest_allowed: false,
       source:        'no_rules',
     };
@@ -158,11 +163,15 @@ export function evaluateAirportService(
     }
   }
 
-  // 6. Default
+  // 6. Default — no allow rule matched, no explicit deny rule matched either.
+  //    This is silence, not denial. Rules describe positive access paths;
+  //    absence of a match means "this passenger doesn't fit any modeled
+  //    path", not "this passenger is explicitly denied". Chip should be
+  //    "?" not "✗". See §63.
   return {
-    status:        'denied',
-    confidence:    0.95,
-    reason:        'No matching access rule found',
+    status:        'not_enough_info',
+    confidence:    0.0,
+    reason:        'No matching access rule found (rules exist but do not cover this passenger)',
     guest_allowed: false,
     source:        'default',
   };
