@@ -157,6 +157,14 @@ export const airportServiceRules = sqliteTable('airport_service_rules', {
            'star_gold', 'star_silver', 'skyteam_elite_plus', 'skyteam_elite', 'none'],
   }),
   carrierRestriction: text('carrier_restriction', { mode: 'json' }).$type<string[]>(),
+  // Tier-hierarchy semantics for this rule (§64). 'alliance_defined' means the tier
+  // requirement is authoritative — if a passenger doesn't meet it (and everything else
+  // does match), engine returns `denied`. 'local' means tier is one of several possible
+  // paths and a miss is inconclusive — engine returns `not_enough_info`.
+  // Default 'local' preserves existing behavior for rules that don't opt in.
+  tierSemantics:      text('tier_semantics', {
+    enum: ['alliance_defined', 'local'],
+  }).notNull().default('local'),
   ...ruleColumns,
 }, (t) => [
   index('asr_airport_idx').on(t.airportId),

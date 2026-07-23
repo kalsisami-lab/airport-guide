@@ -1,0 +1,1 @@
+ALTER TABLE `airport_service_rules` ADD `tier_semantics` text DEFAULT 'local' NOT NULL;

@@ -26,6 +26,7 @@ export interface AirportServiceRuleInput {
   conditions: Condition | null;
   provider: string | null;     // e.g. 'star_alliance_gold_track', 'paid'
   notes: string | null;        // shown in UI tooltip
+  tierSemantics: 'alliance_defined' | 'local';  // §64: how to treat tier miss
 }
 
 export interface AirportServicesResult {
