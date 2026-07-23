@@ -207,7 +207,15 @@ export function evaluateAirportService(
   //    tier is required and the pax doesn't have it. Return `denied` (not
   //    `not_enough_info`).
   //
+  //    Cabin override: skip §64 tier deny if pax cabin is business/first.
+  //    oneworld's own policy (and most airlines' cabin policy) grants fast
+  //    track to premium-cabin pax independent of status. If we haven't
+  //    seeded a separate cabin rule for this airport, denying a premium-
+  //    cabin pax on tier grounds would be a false-certain-negative — same
+  //    class of bug §63 fixed. Fall through to not_enough_info instead.
+  //
   //    Only fires when:
+  //      - passenger.cabin is 'economy' (or unknown)
   //      - rule.tierSemantics === 'alliance_defined'
   //      - miss reason is tier_insufficient OR no_status
   //      - (carrier, condition, provider, alliance all fine)
@@ -215,19 +223,22 @@ export function evaluateAirportService(
   //    All other miss reasons (carrier, wrong_alliance, condition, provider)
   //    fall through to not_enough_info — the app doesn't have a rule that
   //    covers this pax, but airport may have other paths we haven't modeled.
-  for (const rule of allowRules) {
-    if (rule.tierSemantics !== 'alliance_defined') continue;
-    const detail = ruleMatchDetailed(rule, passenger, status, fastTrackCards);
-    if (detail.matched) continue;  // shouldn't happen (would have returned above)
-    if (detail.reason === 'tier_insufficient' || detail.reason === 'no_status') {
-      const tierLabel = TIER_LABEL[rule.minAllianceTier!] ?? rule.minAllianceTier;
-      return {
-        status:        'denied',
-        confidence:    0.9,
-        reason:        `${serviceType} requires ${tierLabel}; passenger tier does not meet the alliance-defined threshold`,
-        guest_allowed: false,
-        source:        `rule:${rule.id}:tier_deny`,
-      };
+  const premiumCabin = passenger.cabin === 'first' || passenger.cabin === 'business';
+  if (!premiumCabin) {
+    for (const rule of allowRules) {
+      if (rule.tierSemantics !== 'alliance_defined') continue;
+      const detail = ruleMatchDetailed(rule, passenger, status, fastTrackCards);
+      if (detail.matched) continue;  // shouldn't happen (would have returned above)
+      if (detail.reason === 'tier_insufficient' || detail.reason === 'no_status') {
+        const tierLabel = TIER_LABEL[rule.minAllianceTier!] ?? rule.minAllianceTier;
+        return {
+          status:        'denied',
+          confidence:    0.9,
+          reason:        `${serviceType} requires ${tierLabel}; passenger tier does not meet the alliance-defined threshold`,
+          guest_allowed: false,
+          source:        `rule:${rule.id}:tier_deny`,
+        };
+      }
     }
   }
 

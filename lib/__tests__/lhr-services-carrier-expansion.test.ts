@@ -73,12 +73,12 @@ describe('LHR services carrier expansion — [BA,IB] → [BA,IB,AA,CX,QF,JL,QR]'
     assert.equal(r.status, 'not_enough_info');
   });
 
-  test('G5: AY Ruby (below Sapphire) on AY LHR→HEL → fast_track DENIED (§64: alliance_defined tier-only miss = authoritative)', () => {
-    const p = makePassenger();
+  test('G5: AY Ruby (below Sapphire) + Economy cabin on AY LHR→HEL → fast_track DENIED (§64: alliance_defined tier-only miss = authoritative)', () => {
+    // Explicitly economy: business/first would trigger §64 cabin override
+    // and return not_enough_info (see tier-semantics-64 T9). This test
+    // targets the "pure tier miss" case where no cabin path applies.
+    const p = makePassenger({ cabin: 'economy' });
     const r = evaluateAirportService(p, makeStatus('oneworld_ruby'), 'fast_track_security', [LHR_FastTrack()], NOW);
-    // §64: LHR fast_track is alliance_defined (oneworld's own Sapphire+ benefit).
-    // Ruby pax fully qualifies on carrier + alliance + everything else, but is
-    // below the tier — that's an authoritative denial, not "we don't know".
     assert.equal(r.status, 'denied');
     assert.equal(r.confidence, 0.9);
   });

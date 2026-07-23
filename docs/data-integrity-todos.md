@@ -1479,16 +1479,25 @@ authoritative because the alliance itself defined the requirement.
     excluded from this initial rollout per user's explicit scope.
     Reclassify later if same-semantics behavior is desired.
 
+**Cabin override:** the §64 tier-deny branch is skipped when
+`passenger.cabin` is 'first' or 'business'. oneworld's own policy (and
+most airlines' general policy) grants fast track and priority boarding
+to premium-cabin passengers independent of frequent-flyer status. If
+the airport hasn't seeded a separate cabin rule, denying a premium-
+cabin pax on tier grounds would be a false-certain-negative — same
+class of bug §63 fixed. Premium-cabin cases fall through to
+not_enough_info instead.
+
 **Behavior matrix (post-§64):**
 
-| Miss reason | tier_semantics=alliance_defined | tier_semantics=local |
-|---|---|---|
-| tier_insufficient | denied conf 0.9 | not_enough_info |
-| no_status | denied conf 0.9 | not_enough_info |
-| wrong_alliance | not_enough_info | not_enough_info |
-| carrier_not_on_list | not_enough_info | not_enough_info |
-| condition_failed | not_enough_info | not_enough_info |
-| provider_not_present | not_enough_info | not_enough_info |
+| Miss reason | tier_semantics=alliance_defined + Economy cabin | + Business/First cabin | tier_semantics=local |
+|---|---|---|---|
+| tier_insufficient | denied conf 0.9 | not_enough_info (cabin override) | not_enough_info |
+| no_status | denied conf 0.9 | not_enough_info (cabin override) | not_enough_info |
+| wrong_alliance | not_enough_info | not_enough_info | not_enough_info |
+| carrier_not_on_list | not_enough_info | not_enough_info | not_enough_info |
+| condition_failed | not_enough_info | not_enough_info | not_enough_info |
+| provider_not_present | not_enough_info | not_enough_info | not_enough_info |
 
 **Empirical (LHR fast_track_security post-§64):**
   - AY Sapphire + AY → allowed ✓

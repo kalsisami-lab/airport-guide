@@ -46,8 +46,9 @@ const LHR_FastTrack = () => makeServiceRule({
 
 describe('§64 — tier-hierarchy deny for alliance_defined rules', () => {
 
-  test('T1: no status + LHR fast_track (alliance_defined sapphire) → DENIED (§64: authoritative tier requirement, no-status = below tier)', () => {
-    const p = makePassenger();
+  test('T1: no status + Economy + LHR fast_track (alliance_defined sapphire) → DENIED (§64: authoritative tier requirement, no-status = below tier)', () => {
+    // Economy explicit: business/first triggers cabin override (see T6/T7).
+    const p = makePassenger({ cabin: 'economy' });
     const r = evaluateAirportService(p, null, 'fast_track_security', [LHR_FastTrack()], NOW);
     assert.equal(r.status, 'denied');
     assert.equal(r.confidence, 0.9);
@@ -92,5 +93,41 @@ describe('§64 — tier-hierarchy deny for alliance_defined rules', () => {
     const p = makePassenger({ cabin: 'business' });
     const r = evaluateAirportService(p, null, 'fast_track_security', [cabinRule], NOW);
     assert.equal(r.status, 'allowed');
+  });
+
+  test('T6: no-status + AY Business + LHR (alliance_defined sapphire rule) → not_enough_info (§64 cabin override: premium cabin ≠ authoritative tier deny)', () => {
+    // Real-world scenario: pax has no oneworld status but is in Business cabin.
+    // oneworld policy grants fast track to Business/First independent of status.
+    // If the airport hasn't seeded a separate cabin rule, denying on tier
+    // would be a false-certain-negative. Cabin override falls through to
+    // not_enough_info instead — "we don't know for sure, might apply".
+    const p = makePassenger({ cabin: 'business' });
+    const r = evaluateAirportService(p, null, 'fast_track_security', [LHR_FastTrack()], NOW);
+    assert.equal(r.status, 'not_enough_info');
+  });
+
+  test('T7: no-status + AY First + LHR → not_enough_info (§64 cabin override — First cabin also protected)', () => {
+    const p = makePassenger({ cabin: 'first' });
+    const r = evaluateAirportService(p, null, 'fast_track_security', [LHR_FastTrack()], NOW);
+    assert.equal(r.status, 'not_enough_info');
+  });
+
+  test('T8: no-status + AY Economy + LHR → DENIED (§64 tier deny applies — no cabin override)', () => {
+    // Regression: cabin override must NOT save economy pax. Alliance-defined
+    // rule authoritatively denies no-status economy.
+    const p = makePassenger({ cabin: 'economy' });
+    const r = evaluateAirportService(p, null, 'fast_track_security', [LHR_FastTrack()], NOW);
+    assert.equal(r.status, 'denied');
+    assert.equal(r.confidence, 0.9);
+  });
+
+  test('T9: Ruby + AY Business + LHR → still not_enough_info (§64 cabin override applies to any premium-cabin pax, not just no-status)', () => {
+    // Even though Ruby is below Sapphire and rule requires Sapphire,
+    // the premium cabin short-circuits §64. This is intentional: we
+    // don't know if this airport has a separate cabin-based path.
+    // Economy Ruby (T-G5 from expansion test) still gets denied.
+    const p = makePassenger({ cabin: 'business' });
+    const r = evaluateAirportService(p, makeStatus('oneworld_ruby'), 'fast_track_security', [LHR_FastTrack()], NOW);
+    assert.equal(r.status, 'not_enough_info');
   });
 });
