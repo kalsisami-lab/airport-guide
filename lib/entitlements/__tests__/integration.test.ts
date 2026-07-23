@@ -202,7 +202,7 @@ describe('LHR', () => {
     assert.notEqual(find(r.lounges, 'British Airways Concorde Room').access.status, 'allowed',
       'Concorde Room ei saa olla allowed pelkällä emerald-statuksella ilman First-lippua');
     // Galleries Club stays all_alliance oneworld_sapphire → Emerald qualifies
-    assert.equal(find(r.lounges, 'British Airways Galleries Club Lounge').access.status, 'allowed');
+    assert.equal(find(r.lounges, 'BA Galleries North Club').access.status, 'allowed');
   });
 
   test('BA Gold + BA-lento + First → Concorde Room allowed (cabin gate satisfied)', () => {
@@ -214,7 +214,7 @@ describe('LHR', () => {
 
     assert.equal(find(r.lounges, 'British Airways Concorde Room').access.status, 'allowed',
       'BA First-lipulla Concorde Room aukeaa (status ei enää portteri)');
-    assert.equal(find(r.lounges, 'British Airways Galleries Club Lounge').access.status, 'allowed');
+    assert.equal(find(r.lounges, 'BA Galleries North Club').access.status, 'allowed');
   });
 
   test('AY Platinum + BA-lento + Business → Concorde Room denied (user field report: emerald+Business ≠ pääsy)', () => {
@@ -229,7 +229,7 @@ describe('LHR', () => {
     assert.notEqual(find(r.lounges, 'British Airways Concorde Room').access.status, 'allowed',
       'Concorde Room ei saa olla allowed emerald + Business -yhdistelmällä');
     // Galleries Club (all_alliance oneworld_sapphire) toimii
-    assert.equal(find(r.lounges, 'British Airways Galleries Club Lounge').access.status, 'allowed');
+    assert.equal(find(r.lounges, 'BA Galleries North Club').access.status, 'allowed');
   });
 
   test('AY Platinum + AY-lento + First → Concorde Room NOT allowed (carrier gate — AY ei BA/IB)', () => {
