@@ -1499,11 +1499,13 @@ not_enough_info instead.
 | condition_failed | not_enough_info | not_enough_info | not_enough_info |
 | provider_not_present | not_enough_info | not_enough_info | not_enough_info |
 
-**Empirical (LHR fast_track_security post-§64):**
-  - AY Sapphire + AY → allowed ✓
-  - AY Ruby + AY → denied ✗ (was "?" under §63 alone — that was the
-    TODO in G5 waiting for this)
-  - No status + BA → denied ✗ (authoritative)
+**Empirical (LHR fast_track_security post-§64 + cabin override):**
+  - AY Sapphire + Economy → allowed ✓
+  - AY Ruby + Economy → denied ✗ (was "?" under §63 alone — G5 TODO cleared)
+  - AY Ruby + Business → not_enough_info ? (cabin override — might qualify via cabin path)
+  - No status + Economy → denied ✗ (authoritative)
+  - No status + Business → not_enough_info ? (cabin override)
+  - No status + First → not_enough_info ? (cabin override)
   - Sapphire + LH flight → not_enough_info ? (wrong alliance, not tier)
   - Amex-holder + LH flight → still allowed via card path (§64 doesn't
     fire because Amex rule is `local`)
