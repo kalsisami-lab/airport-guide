@@ -1261,3 +1261,89 @@ against a future oneworld.com refresh and re-flags one of these
 airports, no re-investigation is needed unless the underlying situation
 changes (BIQ/BOO/KKN/TOS get a new lounge, GZP reopens, TRD joins
 oneworld — none of which is imminent).
+
+---
+
+## 60. DXB Marhaba Lounge — QR condition text not modeled
+
+**Risk:** oneworld.com's DXB Marhaba Lounge page has:
+  - **Carrier eligibility list:** [Finnair, Royal Air Maroc] → seeded as
+    carrier_specific `[AY, AT]` sapphire.
+  - **Additional text (not on the eligibility list):** "First and
+    Business Class and oneworld Emerald customer... travelling on
+    Qatar Airways operating flight."
+
+The exact reading of the QR text is ambiguous without seeing the full
+page context. Could be:
+  - OR-list ("First/Business ticket OR Emerald status, on QR") — the
+    standard oneworld reciprocal access wording restated for QR
+  - AND-conjunction ("First/Business ticket AND Emerald status AND QR")
+    — an unusually restrictive combination
+
+**Chose the conservative direction:** [AY, AT] only, no QR path
+modeled. Rationale:
+  - Source data's carrier eligibility list is authoritative; text
+    below is at best a repeat of standard rules
+  - False positive (told access, denied at door) is worse UX than
+    false negative (told no access, try anyway, find it works). Same
+    reasoning as LHR BA Concorde Room migration (Phase #6) which was
+    driven by a user's field report on the same UX failure.
+
+**Action needed:** If a QR Emerald+Business/First user reports being
+admitted at DXB Marhaba, add QR to the carrier list. Same category
+as §53 (QR Business Lite), §56 (program-specific tiers).
+
+---
+
+## 61. DXB BA Lounge — overnight opening hours require engine verification
+
+**Risk:** DXB BA Lounge (T1, Concourse D 1st floor) has two-shift
+hours: **06:30–13:30 + 21:30–02:30**. The second range crosses
+midnight, which is a distinct case from two ranges in the same
+calendar day.
+
+Schema-wise, `opening_hours` is a JSON blob with per-day arrays that
+in principle can hold multiple time ranges. But `checkOpeningHours`
+(engine layer) may or may not correctly handle a range where end < start
+(implying "past midnight into next day").
+
+**Action needed:** Verify `checkOpeningHours` behavior with a
+midnight-crossing range before relying on it. If the engine truncates
+at 24:00 or treats end < start as "closed all day", the model needs
+either:
+  (a) engine fix to interpret 21:30–02:30 as "21:30 today + 00:00–02:30
+      tomorrow"
+  (b) modeling workaround: split into two ranges "21:30–23:59 today"
+      and "00:00–02:30 today"
+
+Interim modeling for DXB BA Lounge in this batch: single range
+"06:30–13:30" only (understates true availability). §61-TODO tracks
+extending to the full two-shift once engine behavior is verified.
+
+---
+
+## 62. §52 AND-type wording — third field-verified case (JFK Chelsea)
+
+**Third confirmed instance** of the §52 AND-type wording pattern
+(cabin=first + named program cards, no Emerald Tier line). Chelsea
+joins BA Concorde Room and DOH Al Safwa:
+
+  - **LHR BA Concorde Room** (Phase #6) — field-verified 2026
+  - **DOH Al Safwa First Lounge** (§52 audit) — audited via wording
+  - **JFK BA/AA Chelsea Lounge** (JFK batch) — field-verified 2026:
+    Finnair Platinum (Emerald) + AY Business → NOT admitted. Modeled
+    as `airline_own [AA, BA] + cabin='first'`, no min_tier. Same
+    program-tier abstraction gap as §56 (AA Concierge Key, BA Gold
+    Guest List paths not modeled).
+
+Contrast BA/AA Soho Lounge (same terminal, adjacent lounge): data
+shows "First Class" AND "Emerald Tier" as separate lines → §52 OR-model
+(all_alliance + emerald, no cabin). Field-verified: same user + same
+trip, AY Platinum + Business → ADMITTED to Soho.
+
+Chelsea and Soho are the cleanest side-by-side test of §52's two
+models in the wild. Tests L1 (Chelsea denied) and L4/L5 (Soho: Sapphire
+denied, Emerald allowed) preserve this distinction.
+
+**Action needed:** None — modeled correctly. Update §56 if a fourth
+case emerges (AA Flagship First Dining or similar).

@@ -253,37 +253,52 @@ describe('LHR', () => {
 // ─── JFK ─────────────────────────────────────────────────────────────────────
 
 describe('JFK', () => {
-  test('AY Gold (sapphire) + IB-lento → Flagship denied (vaatii emeraldin), Admirals allowed', () => {
+  // Phase 35: AA Flagship Lounge deleted (T8 consolidation split it into
+  // Chelsea/Greenwich/Soho). Test scenarios rewritten to cover the new lounges.
+
+  test('AY Gold (sapphire) + IB Economy JFK→MAD → Greenwich allowed, Soho denied (emerald), Chelsea denied (cabin), Admirals allowed', () => {
     const r = findEntitlementsAtAirport(
       { statusCards: [{ programCode: 'ay-plus', tierName: 'Gold' }] },
       { operatingCarrier: 'IB', cabin: 'economy', departureAirport: 'JFK', arrivalAirport: 'MAD' },
       repos, { now: OPEN },
     );
 
-    assert.equal(find(r.lounges, 'American Airlines Flagship Lounge').access.status,
-      'denied', 'Flagship: all_alliance oneworld_emerald — sapphire ei riitä');
+    assert.equal(find(r.lounges, 'BA/AA Greenwich Lounge').access.status,
+      'allowed', 'Greenwich: Ryhmä 1 sapphire, IB on 9-carrier list');
+    assert.notEqual(find(r.lounges, 'BA/AA Soho Lounge').access.status,
+      'allowed', 'Soho: Ryhmä 1 emerald — sapphire ei riitä');
+    assert.notEqual(find(r.lounges, 'BA/AA Chelsea Lounge').access.status,
+      'allowed', 'Chelsea: airline_own [AA,BA] + cabin=first — IB carrier + Economy = ei pääsy');
     assert.equal(find(r.lounges, 'American Airlines Admirals Club').access.status,
       'allowed', 'Admirals: all_alliance oneworld_sapphire — sapphire riittää');
   });
 
-  test('BA Gold (emerald) + IB-lento → molemmat JFK loungit allowed', () => {
+  test('BA Gold (emerald) + IB Economy JFK→MAD → Greenwich + Soho + Admirals allowed, Chelsea denied (cabin gate — emerald ei korvaa First-vaatimusta)', () => {
     const r = findEntitlementsAtAirport(
       { statusCards: [{ programCode: 'ba-exec-club', tierName: 'Gold' }] },
       { operatingCarrier: 'IB', cabin: 'economy', departureAirport: 'JFK', arrivalAirport: 'MAD' },
       repos, { now: OPEN },
     );
 
-    assert.equal(find(r.lounges, 'American Airlines Flagship Lounge').access.status,
-      'allowed', 'Flagship: all_alliance emerald — BA Gold = emerald OK');
+    assert.equal(find(r.lounges, 'BA/AA Greenwich Lounge').access.status,
+      'allowed', 'Greenwich sapphire — emerald riittää');
+    assert.equal(find(r.lounges, 'BA/AA Soho Lounge').access.status,
+      'allowed', 'Soho emerald — §52 OR-model, emerald yksin riittää');
     assert.equal(find(r.lounges, 'American Airlines Admirals Club').access.status,
       'allowed');
+    assert.notEqual(find(r.lounges, 'BA/AA Chelsea Lounge').access.status,
+      'allowed', 'Chelsea: §52 AND-tyyppi — First-lippu vaadittu (§62 field-verified)');
   });
 });
 
 // ─── DXB ─────────────────────────────────────────────────────────────────────
 
 describe('DXB', () => {
-  test('EK economy, ei statusta → Emirates loungit allowed (airline_own), fast track denied', () => {
+  // Phase 35: Emirates lounges renamed (dropped "Class"). Added Ryhmä 1 [QF,AY]
+  // channels alongside existing airline_own [EK] channels. EK's own pax still
+  // access via airline_own; QF+AY now access via oneworld carrier_specific.
+
+  test('EK economy, ei statusta → Emirates loungit allowed (airline_own EK), fast track denied', () => {
     const r = findEntitlementsAtAirport(
       { statusCards: [] },
       { operatingCarrier: 'EK', cabin: 'economy', departureAirport: 'DXB', arrivalAirport: 'LHR' },
@@ -291,21 +306,23 @@ describe('DXB', () => {
     );
 
     assert.equal(r.status, null, 'Ei statuskorttia → status null');
-    assert.equal(find(r.lounges, 'Emirates First Class Lounge').access.status,    'allowed');
-    assert.equal(find(r.lounges, 'Emirates Business Class Lounge').access.status, 'allowed');
+    assert.equal(find(r.lounges, 'Emirates First Lounge').access.status,    'allowed');
+    assert.equal(find(r.lounges, 'Emirates Business Lounge').access.status, 'allowed');
     assert.equal(r.fastTrack.available, false);
   });
 
-  test('AY Gold + AY-lento DXB → Emirates loungit denied (ei EK-carrier)', () => {
+  test('AY Gold (sapphire) + AY-lento DXB → Business allowed (Ryhmä 1 sapphire), First denied (emerald floor)', () => {
     const r = findEntitlementsAtAirport(
       { statusCards: [{ programCode: 'ay-plus', tierName: 'Gold' }] },
       { operatingCarrier: 'AY', cabin: 'economy', departureAirport: 'DXB', arrivalAirport: 'HEL' },
       repos, { now: OPEN },
     );
 
-    // Operating carrier AY ≠ EK → airline_own EK restriction not met
-    assert.equal(find(r.lounges, 'Emirates First Class Lounge').access.status,    'denied');
-    assert.equal(find(r.lounges, 'Emirates Business Class Lounge').access.status, 'denied');
+    // AY now on carrier_specific [QF,AY] list. Sapphire enough for Business, not First (emerald).
+    assert.equal(find(r.lounges, 'Emirates Business Lounge').access.status, 'allowed',
+      'Emirates Business — Ryhmä 1 sapphire, AY on carrier list');
+    assert.notEqual(find(r.lounges, 'Emirates First Lounge').access.status, 'allowed',
+      'Emirates First — Ryhmä 1 emerald, sapphire ei riitä');
   });
 });
 
