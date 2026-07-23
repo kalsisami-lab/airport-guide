@@ -1209,3 +1209,55 @@ unreachable) are the more common failure mode of a mislabeled zone.
 Alternative: if a user reports "showed unreachable but I was in the
 same terminal", check the zone assignment first before assuming an
 engine bug.
+
+---
+
+## 59. Ryhmä 4 (PP-only) airports — investigation results (CLOSED)
+
+**Status:** Investigation complete (2026-07). All 6 airports deliberately
+NOT seeded. This section closes the Ryhmä 4 open question.
+
+**Scope:** classify-lounges.ts flagged 6 airports as Ryhmä 4 (PP-only,
+no oneworld lounge on scrape): BIQ, BOO, GZP, KKN, TOS, TRD. Deferred
+from all autonomous batches per user rule. Manual investigation confirms
+none are seedable as oneworld or PP entries useful to the app's target
+audience (Finnair-network passengers):
+
+**(a) No lounge exists — nothing to seed:**
+  - **BIQ** (Biarritz Pays Basque)
+  - **BOO** (Bodø)
+  - **KKN** (Kirkenes)
+  - **TOS** (Tromsø)
+
+  Small regional Norwegian / French airports without any lounge offering.
+
+**(b) Closed lounge (§39-style deferral):**
+  - **GZP** (Gazipaşa-Alanya) — CIP lounge closed. PP/DragonPass directs
+    cardholders to AYT (Antalya, seeded Batch 3f). Same deferral shape
+    as §39a (RHO Skyserv), §44 (PRG Menzies), §48 (NRT Cathay Pacific),
+    §55 (EDI No1 Lounge). Watch for reopening.
+
+**(c) Non-oneworld lounge exists but no value for target audience:**
+  - **TRD** (Trondheim Værnes) — SAS Lounge (Terminal A domestic +
+    Terminal B international). Access is Star Alliance / SkyTeam only
+    (SAS Business/Plus, EuroBonus Gold/Diamond, SkyTeam Elite Plus, LH
+    Group Business LH/LX/OS/SN, Widerøe Premium). **No oneworld member
+    is listed for access.**
+
+    Also NOT on Priority Pass network — accessible only via SAS's own
+    app. So even the PP/paid fallback that GZP would have offered
+    (if reopened) doesn't apply here.
+
+    No value for Finnair-network customers — deliberately not seeded.
+
+**Broader observation:** The Ryhmä 4 shorthand "PP-only, no oneworld"
+combined three structurally distinct situations. Only (b) is potentially
+seedable in the future, and only if it reopens. (a) and (c) are
+permanent non-entries in the oneworld / PP scope of this app.
+
+**Action needed:** None. This section serves as the record that Ryhmä 4
+has been reviewed and consciously left unseeded. If the scrape re-runs
+against a future oneworld.com refresh and re-flags one of these
+airports, no re-investigation is needed unless the underlying situation
+changes (BIQ/BOO/KKN/TOS get a new lounge, GZP reopens, TRD joins
+oneworld — none of which is imminent).
