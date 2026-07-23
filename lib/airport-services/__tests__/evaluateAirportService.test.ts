@@ -50,6 +50,7 @@ function makeRule(overrides: Partial<AirportServiceRuleInput> = {}): AirportServ
     conditions:         null,
     provider:           null,
     notes:              null,
+    tierSemantics:      'local',  // §64 default; explicit tests set 'alliance_defined'
     ...overrides,
   };
 }

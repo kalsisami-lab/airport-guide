@@ -39,10 +39,10 @@ const EXPANDED_CARRIERS = ['BA', 'IB', 'AA', 'CX', 'QF', 'JL', 'QR', 'AY'];
 function makeRule(o: Partial<AirportServiceRuleInput> = {}): AirportServiceRuleInput {
   return { id: 100, priority: 100, validFrom: '2020-01-01', validTo: null, confidence: 0.95,
     minAllianceTier: null, carrierRestriction: null, conditions: null,
-    provider: null, action: 'allow', notes: null, ...o };
+    provider: null, action: 'allow', notes: null, tierSemantics: 'alliance_defined', ...o };
 }
-const LHR_FastTrack     = () => makeRule({ id: 4,  minAllianceTier: 'oneworld_sapphire', carrierRestriction: EXPANDED_CARRIERS, notes: 'Terminal 3 and Terminal 5 only', confidence: 0.95 });
-const LHR_PriorityBoard = () => makeRule({ id: 11, minAllianceTier: 'oneworld_emerald', carrierRestriction: EXPANDED_CARRIERS, notes: 'Terminal 3 and Terminal 5 only', confidence: 0.9 });
+const LHR_FastTrack     = () => makeRule({ id: 4,  minAllianceTier: 'oneworld_sapphire', carrierRestriction: EXPANDED_CARRIERS, notes: 'Terminal 3 and Terminal 5 only', confidence: 0.95, tierSemantics: 'alliance_defined' });
+const LHR_PriorityBoard = () => makeRule({ id: 11, minAllianceTier: 'oneworld_emerald', carrierRestriction: EXPANDED_CARRIERS, notes: 'Terminal 3 and Terminal 5 only', confidence: 0.9,  tierSemantics: 'alliance_defined' });
 
 describe('LHR services carrier expansion — [BA,IB] → [BA,IB,AA,CX,QF,JL,QR]', () => {
 
@@ -73,10 +73,13 @@ describe('LHR services carrier expansion — [BA,IB] → [BA,IB,AA,CX,QF,JL,QR]'
     assert.equal(r.status, 'not_enough_info');
   });
 
-  test('G5: AY Ruby (below Sapphire) on AY LHR→HEL → fast_track not_enough_info (regression: tier gate still enforced)', () => {
+  test('G5: AY Ruby (below Sapphire) on AY LHR→HEL → fast_track DENIED (§64: alliance_defined tier-only miss = authoritative)', () => {
     const p = makePassenger();
     const r = evaluateAirportService(p, makeStatus('oneworld_ruby'), 'fast_track_security', [LHR_FastTrack()], NOW);
-    // §63: rule requires sapphire, ruby doesn't meet → rule silent (not denied)
-    assert.equal(r.status, 'not_enough_info');
+    // §64: LHR fast_track is alliance_defined (oneworld's own Sapphire+ benefit).
+    // Ruby pax fully qualifies on carrier + alliance + everything else, but is
+    // below the tier — that's an authoritative denial, not "we don't know".
+    assert.equal(r.status, 'denied');
+    assert.equal(r.confidence, 0.9);
   });
 });

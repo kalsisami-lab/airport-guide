@@ -135,6 +135,7 @@ export function createAirportRepository(): AirportRepository {
           conditions:         (r.conditions as Condition) ?? null,
           provider:           r.provider ?? null,
           notes:              r.notes ?? null,
+          tierSemantics:      (r.tierSemantics ?? 'local') as 'alliance_defined' | 'local',
         }));
     },
   };

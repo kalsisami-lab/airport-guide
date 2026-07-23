@@ -106,6 +106,7 @@ function makeServiceRule(overrides: Partial<AirportServiceRuleInput> = {}): Airp
     conditions:         null,
     provider:           null,
     notes:              null,
+    tierSemantics:      'local',  // §64 default
     ...overrides,
   };
 }

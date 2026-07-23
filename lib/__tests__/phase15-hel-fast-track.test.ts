@@ -47,16 +47,16 @@ const tierRepo: TierRepository = {
 };
 
 const HEL_FT_RULES: AirportServiceRuleInput[] = [
-  // existing
-  { id: 1,  priority: 100, validFrom: '2020-01-01', validTo: null, confidence: 0.99, action: 'allow', provider: null,                minAllianceTier: 'oneworld_sapphire', carrierRestriction: null,       conditions: null, notes: null },
-  { id: 2,  priority: 100, validFrom: '2020-01-01', validTo: null, confidence: 0.95, action: 'allow', provider: null,                minAllianceTier: 'star_gold',         carrierRestriction: null,       conditions: null, notes: null },
-  { id: 3,  priority: 100, validFrom: '2020-01-01', validTo: null, confidence: 0.90, action: 'allow', provider: null,                minAllianceTier: 'skyteam_elite_plus', carrierRestriction: null,      conditions: null, notes: null },
+  // existing (alliance_defined: standard oneworld/star/skyteam tier benefits)
+  { id: 1,  priority: 100, validFrom: '2020-01-01', validTo: null, confidence: 0.99, action: 'allow', provider: null,                minAllianceTier: 'oneworld_sapphire', carrierRestriction: null,       conditions: null, notes: null, tierSemantics: 'alliance_defined' },
+  { id: 2,  priority: 100, validFrom: '2020-01-01', validTo: null, confidence: 0.95, action: 'allow', provider: null,                minAllianceTier: 'star_gold',         carrierRestriction: null,       conditions: null, notes: null, tierSemantics: 'alliance_defined' },
+  { id: 3,  priority: 100, validFrom: '2020-01-01', validTo: null, confidence: 0.90, action: 'allow', provider: null,                minAllianceTier: 'skyteam_elite_plus', carrierRestriction: null,      conditions: null, notes: null, tierSemantics: 'alliance_defined' },
   // phase 15
-  { id: 12, priority: 80,  validFrom: '2020-01-01', validTo: null, confidence: 0.95, action: 'allow', provider: null,                minAllianceTier: 'oneworld_ruby',     carrierRestriction: ['AY'],     conditions: null, notes: 'Finnair Plus Silver' },
-  { id: 13, priority: 70,  validFrom: '2020-01-01', validTo: null, confidence: 0.90, action: 'allow', provider: null,                minAllianceTier: null,                carrierRestriction: null,       conditions: { op: 'in', field: 'passenger.cabin', values: ['business', 'first'] }, notes: 'Business/First class cabin' },
-  { id: 14, priority: 60,  validFrom: '2020-01-01', validTo: null, confidence: 0.90, action: 'allow', provider: 'amex_centurion',    minAllianceTier: null,                carrierRestriction: null,       conditions: null, notes: 'Amex Platinum Finland' },
-  { id: 15, priority: 60,  validFrom: '2020-01-01', validTo: null, confidence: 0.90, action: 'allow', provider: 'nordea_fast_track', minAllianceTier: null,                carrierRestriction: null,       conditions: null, notes: 'Nordea Platinum / Black' },
-  { id: 16, priority: 60,  validFrom: '2020-01-01', validTo: null, confidence: 0.90, action: 'allow', provider: 'aktia_fast_track',  minAllianceTier: null,                carrierRestriction: null,       conditions: null, notes: 'Aktia Visa Infinite' },
+  { id: 12, priority: 80,  validFrom: '2020-01-01', validTo: null, confidence: 0.95, action: 'allow', provider: null,                minAllianceTier: 'oneworld_ruby',     carrierRestriction: ['AY'],     conditions: null, notes: 'Finnair Plus Silver', tierSemantics: 'alliance_defined' },
+  { id: 13, priority: 70,  validFrom: '2020-01-01', validTo: null, confidence: 0.90, action: 'allow', provider: null,                minAllianceTier: null,                carrierRestriction: null,       conditions: { op: 'in', field: 'passenger.cabin', values: ['business', 'first'] }, notes: 'Business/First class cabin', tierSemantics: 'local' },
+  { id: 14, priority: 60,  validFrom: '2020-01-01', validTo: null, confidence: 0.90, action: 'allow', provider: 'amex_centurion',    minAllianceTier: null,                carrierRestriction: null,       conditions: null, notes: 'Amex Platinum Finland', tierSemantics: 'local' },
+  { id: 15, priority: 60,  validFrom: '2020-01-01', validTo: null, confidence: 0.90, action: 'allow', provider: 'nordea_fast_track', minAllianceTier: null,                carrierRestriction: null,       conditions: null, notes: 'Nordea Platinum / Black', tierSemantics: 'local' },
+  { id: 16, priority: 60,  validFrom: '2020-01-01', validTo: null, confidence: 0.90, action: 'allow', provider: 'aktia_fast_track',  minAllianceTier: null,                carrierRestriction: null,       conditions: null, notes: 'Aktia Visa Infinite', tierSemantics: 'local' },
 ];
 
 function makeAirportRepo(): AirportRepository {

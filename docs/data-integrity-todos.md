@@ -1425,3 +1425,84 @@ non-empty `carrier_restriction` at time of §63 fix. Two paths:
     has 7 other rules covering broader eligibility paths, so this
     narrow rule doesn't misrepresent — it's a specific benefit for a
     specific case. No change.
+
+---
+
+## 64. Airport service tier semantics — alliance-defined vs. local
+
+**Risk (fixed):** §63 correctly turned "no rule matches" into
+`not_enough_info`, but that swept up cases where a rule miss IS
+authoritative. Specifically: oneworld defines fast_track_security,
+priority_boarding, and priority_checkin as alliance-tier-level benefits
+(Sapphire+ / Emerald). If a Ruby passenger fully qualifies on the LHR
+fast_track rule's carrier list + alliance + everything else BUT is
+below the required Sapphire tier, that's not "we don't know" — that's
+oneworld's own policy saying "Ruby isn't eligible for fast track".
+
+Under §63, this returned `not_enough_info` (chip "?"). Semantically
+correct in the general case ("rule silent about Ruby"), but for
+oneworld-defined benefits it's overly humble — Ruby passengers should
+see the honest "✗ Denied" for fast track and know oneworld doesn't
+give them the benefit.
+
+**Fix:** Added `tier_semantics` column to `airport_service_rules`
+(`'alliance_defined' | 'local'`, default `'local'`). Engine
+introduces a §64 tier-hierarchy deny branch AFTER the allow loop but
+BEFORE the default `not_enough_info` return. When an alliance_defined
+rule's miss was ONLY due to tier (or no status), engine returns
+`denied` with confidence 0.9. All other miss reasons (carrier,
+alliance mismatch, condition failed, provider not present) still
+return `not_enough_info` — those are silence, not denial.
+
+**Classification (initial seed):**
+  - `alliance_defined`: fast_track_security, priority_boarding,
+    priority_checkin rules with `min_alliance_tier != NULL`
+  - `local`: everything else, including priority_baggage rules and
+    all card-provider / cabin-only rules
+
+**Why lounges use `local` semantics (not alliance_defined):** lounge
+access has many parallel paths (alliance tier, cards, walk-in, cabin).
+A lounge rule requiring emerald doesn't declare "only emerald qualifies
+here" — it declares "here is one path via emerald; other rules may
+declare other paths". Tier miss on a lounge rule = silence, not deny.
+Consistent with §56 (program-specific tiers can't be modeled) and §60
+(QR condition ambiguity) reasoning.
+
+**Why airport services can use alliance_defined:** the three service
+types above are defined by alliance policy at the tier level.
+oneworld's own policy is Sapphire+ → fast track. If we've seeded the
+airport correctly, a tier miss under an alliance-defined rule IS
+authoritative because the alliance itself defined the requirement.
+
+**Not classified as alliance_defined (yet):**
+  - `priority_baggage` — arguably also a oneworld Sapphire+ benefit but
+    excluded from this initial rollout per user's explicit scope.
+    Reclassify later if same-semantics behavior is desired.
+
+**Behavior matrix (post-§64):**
+
+| Miss reason | tier_semantics=alliance_defined | tier_semantics=local |
+|---|---|---|
+| tier_insufficient | denied conf 0.9 | not_enough_info |
+| no_status | denied conf 0.9 | not_enough_info |
+| wrong_alliance | not_enough_info | not_enough_info |
+| carrier_not_on_list | not_enough_info | not_enough_info |
+| condition_failed | not_enough_info | not_enough_info |
+| provider_not_present | not_enough_info | not_enough_info |
+
+**Empirical (LHR fast_track_security post-§64):**
+  - AY Sapphire + AY → allowed ✓
+  - AY Ruby + AY → denied ✗ (was "?" under §63 alone — that was the
+    TODO in G5 waiting for this)
+  - No status + BA → denied ✗ (authoritative)
+  - Sapphire + LH flight → not_enough_info ? (wrong alliance, not tier)
+  - Amex-holder + LH flight → still allowed via card path (§64 doesn't
+    fire because Amex rule is `local`)
+
+**Migration:** `db/migrations/0002_wide_betty_ross.sql` adds the column
+with default `local`. Backfill via `patch-seed-tier-semantics.ts`
+promotes 12 existing rules to `alliance_defined`.
+
+**Action needed:** None. Any new seed script must set tier_semantics
+explicitly for airport service rules (default 'local' is safe but
+under-specifies for oneworld/star/skyteam tier-based rules).
