@@ -970,3 +970,120 @@ and cathaypacific.com/lounges for reopening. Seed as a new lounge under
 airport_id for NRT (id=112) with the standard Ryhmä 2 shape
 (alliance_status/all_alliance/oneworld_sapphire/conf 0.99). Same shape
 as §39a (RHO Skyserv) and §44 (PRG Menzies) deferrals.
+
+---
+
+## 51. Wording-based Ryhmä 1 vs Ryhmä 2 classification (adopted UK batch)
+
+**Risk:** Original Ryhmä-classification (§47) uses lounge name patterns
+(`classify-lounges.ts` RYHMA_2_TOKENS: "British Airways", "Cathay Pacific",
+etc.). This is a proxy for the underlying rule; oneworld.com actually
+distinguishes access via distinct wording on each lounge card:
+
+  - **"Access for eligible customers traveling on ANY oneworld member
+    airline"** → Ryhmä 2, `all_alliance` model. Carrier list on the page
+    is informative, not gating.
+  - **"Access for eligible customers traveling on THESE oneworld member
+    airlines only"** → Ryhmä 1, `carrier_specific` model. Carrier list
+    is authoritative (with §36 AY-lisäys where the snapshot is
+    seasonally stale for Finnair).
+
+Wording-based classification is objective, whereas name-based
+classification depends on the operator's brand choices — a lounge could
+be operated by a non-oneworld airline but still use the "ANY oneworld"
+policy (e.g. a contract lounge), or a oneworld airline could restrict
+their own lounge to specific partner carriers ("THESE only").
+
+**Action needed:** Retroactive audit of prior batches (3a–3f) against
+this wording criterion. Scrape output currently doesn't carry the exact
+wording — needs re-scrape with `unmappedCarrierNames` + full access
+policy text captured. Own project; do not block current batch. In UK
+batch (LHR/MAN/EDI) this rule was applied from the outset because the
+data was gathered manually with wording checked directly.
+
+---
+
+## 52. "First Class" + "Emerald Tier" wording — OR vs AND (adopted UK batch)
+
+**Risk:** For "first class" lounges, oneworld.com's access rules use
+two distinct wordings that map to different engine models:
+
+  - **Both "First Class" AND "Emerald Tier" listed as separate lines**
+    → OR condition. Emerald status ALONE grants access, even on a
+    Business ticket. Model: `all_alliance` (or `carrier_specific`) with
+    `min_alliance_tier = 'oneworld_emerald'`, **no cabin condition**.
+
+  - **Only "First Class" listed, no "Emerald Tier" line** → AND-type
+    (or ticket-based). Requires cabin=first, potentially plus named
+    program cards (BA Concorde Room Cardholder, AA Concierge Key etc.).
+    Model: `airline_own` with `conditions: cabin='first'`.
+
+**Field-verified examples:**
+  - LHR Cathay Pacific First Class Lounge, LHR AA International First
+    Class Lounge — data shows both lines separately. User's
+    first-hand: Finnair Platinum (Emerald) + Business ticket → in.
+    Modeled as `all_alliance` + `oneworld_emerald`, no cabin.
+  - LHR BA Concorde Room — data shows only "First Class" plus named
+    BA program cards, no "Emerald Tier" line. User's first-hand:
+    Finnair Platinum (Emerald) + Business ticket → DENIED. Modeled as
+    `airline_own [BA,IB]` + `cabin='first'` (Phase #6 fix).
+
+**Action needed for audit (own project, §51 audit):**
+DB rows with `min_tier = oneworld_emerald` today:
+  - DOH Al Safwa First Lounge (Batch 2c) — needs wording verification
+  - DOH Qatar Airways Platinum Lounge - South (Batch 2c) — needs wording verification
+  - HEL Finnair Platinum Wing (pre-baseline) — likely correct
+  - JFK American Airlines Flagship Lounge (Phase 30) — likely correct
+  - OSL OSL Premium Lounge (Phase 25) — carrier_specific + emerald, unusual
+Named-program-only access paths (Concorde Room Cardholder, AA Concierge
+Key) are not currently modeled and skipped as low-user-count edge cases.
+
+---
+
+## 53. QR Premium Lounge (LHR T4) — "Business Lite" not distinguished
+
+**Risk:** LHR QR Premium Lounge oneworld.com access rule reads:
+"First Class or Business Class **revenue** ticket (Business Lite not
+eligible)". The engine's `passenger.cabin` field is one of `first`,
+`business`, `economy` — it has no "Business Lite" distinction.
+
+Modeled in the UK batch as `conditions: {op:'in', field:'passenger.cabin',
+values:['first','business']}`. This is slightly permissive: a Business
+Lite passenger (which the engine sees as `cabin: 'business'`) would be
+allowed by the model but denied at the door.
+
+**Action needed:** Fare-class-level modeling is out of scope for the
+current engine. Impact narrow: Business Lite is a Qatar-specific fare
+class, not commonly held by Finnair-network passengers via codeshare.
+Revisit when the engine gains fare-basis awareness, or when a user
+reports being denied entry.
+
+---
+
+## 54. BA Arrivals Lounge (LHR T5) — arrivals lounges not modeled
+
+**Risk:** oneworld.com policy: "Arrivals lounges are excluded" from the
+standard oneworld reciprocal access rules. The engine models departure
+lounges only — a passenger enters a lounge at their departure airport,
+not their arrival. Arrivals lounges are a departure-airport service for
+the arriving passenger (post-flight shower/breakfast/etc.).
+
+LHR BA T5 Arrivals Lounge exists physically (BA Club/Gold members
+disembarking from a long-haul flight) but is not seeded in the UK batch.
+
+**Action needed:** Engine would need a new lounge category
+(e.g. `is_arrivals` boolean on the lounge row + logic to show it as an
+arrival-side service). Not required for MVP. If added, seed:
+  BA Arrivals Lounge (T5)  airline_own [BA,IB]  ~cabin~ any + arrival-side flag.
+
+---
+
+## 55. EDI No1 Lounge — temporarily closed (UK batch skip)
+
+**Risk:** EDI No1 Lounge listed on oneworld.com but tagged "Temporarily
+closed" as of UK batch seeding (2026-07). Not seeded. Same shape as
+§39a (RHO Skyserv), §44 (PRG Menzies), §48 (NRT Cathay Pacific).
+
+**Action needed:** Watch oneworld.com/airport-lounge-results?location=EDI
+for reopening. Seed as Ryhmä 1 (standard 5-channel model, carrier list
+per snapshot + §36 AY-lisäys if AY missing) under airport_id for EDI.
