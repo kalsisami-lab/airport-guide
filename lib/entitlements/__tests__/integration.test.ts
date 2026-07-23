@@ -143,19 +143,21 @@ describe('FRA', () => {
     assert.equal(r.fastTrack.available, true);
   });
 
-  test('AY Gold 10:30 → JAL Sakura ja Qatar Business allowed (non-Schengen-kohde)', () => {
-    // FRA→JFK: non-Schengen kohde → non-Schengen loungit ovat fyysisesti saavutettavissa
+  test('AY Gold 10:30 FRA→JFK (non-Schengen) → Priority Lounge T2/T3 allowed (§36 AY on carrier list)', () => {
+    // FRA→JFK: non-Schengen destination → non-Schengen T2 Priority Lounge reachable.
+    // Post-Phase 34: JAL Sakura and Qatar Business Lounge deleted as demo data;
+    // Priority Lounge (T2/T3) are the real oneworld lounges here.
     const r = findEntitlementsAtAirport(
       { statusCards: [{ programCode: 'ay-plus', tierName: 'Gold' }] },
       { operatingCarrier: 'AY', cabin: 'economy', departureAirport: 'FRA', arrivalAirport: 'JFK' },
       repos, { now: new Date('2025-05-16T10:30:00') },
     );
 
-    const jal = find(r.lounges, 'Japan Airlines Sakura Lounge');
-    assert.equal(jal.access.status, 'allowed', 'JAL Sakura auki 09–15, AY Gold = sapphire all_alliance');
+    const priorityT2 = find(r.lounges, 'Priority Lounge (T2)');
+    assert.equal(priorityT2.access.status, 'allowed', 'Priority Lounge T2 auki 06:30–19:30, §36 [QR,AY]');
 
-    const qr = find(r.lounges, 'Qatar Airways Business Lounge');
-    assert.equal(qr.access.status, 'allowed');
+    const priorityT3 = find(r.lounges, 'Priority Lounge (T3)');
+    assert.equal(priorityT3.access.status, 'allowed', 'Priority Lounge T3 auki 06:00–21:00, §36 [AA,BA,CX,JL,AY]');
   });
 
   test('AY Gold 10:30 FRA→HEL (Schengen) → non-Schengen loungit physically_unreachable', () => {
@@ -165,21 +167,24 @@ describe('FRA', () => {
       repos, { now: new Date('2025-05-16T10:30:00') },
     );
 
-    const jal = find(r.lounges, 'Japan Airlines Sakura Lounge');
-    assert.equal(jal.access.status, 'physically_unreachable', 'JAL Sakura non-Schengen — Schengen-lento ei pääse');
+    const priorityT2 = find(r.lounges, 'Priority Lounge (T2)');
+    assert.equal(priorityT2.access.status, 'physically_unreachable', 'Priority T2 non-Schengen — Schengen-lento ei pääse');
 
-    const qr = find(r.lounges, 'Qatar Airways Business Lounge');
-    assert.equal(qr.access.status, 'physically_unreachable');
+    const priorityT3 = find(r.lounges, 'Priority Lounge (T3)');
+    assert.equal(priorityT3.access.status, 'physically_unreachable');
+
+    const afklm = find(r.lounges, 'Air France/KLM Lounge');
+    assert.equal(afklm.access.status, 'physically_unreachable');
   });
 
-  test('AY Gold 04:00 → JAL Sakura closed', () => {
+  test('AY Gold 04:00 → Priority Lounge T2 closed (hours 06:30–19:30)', () => {
     const r = findEntitlementsAtAirport(
       { statusCards: [{ programCode: 'ay-plus', tierName: 'Gold' }] },
-      { operatingCarrier: 'AY', cabin: 'economy', departureAirport: 'FRA', arrivalAirport: 'HEL' },
+      { operatingCarrier: 'AY', cabin: 'economy', departureAirport: 'FRA', arrivalAirport: 'JFK' },
       repos, { now: EARLY },
     );
-    const jal = find(r.lounges, 'Japan Airlines Sakura Lounge');
-    assert.equal(jal.access.status, 'closed');
+    const priorityT2 = find(r.lounges, 'Priority Lounge (T2)');
+    assert.equal(priorityT2.access.status, 'closed');
   });
 });
 

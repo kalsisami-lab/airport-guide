@@ -1143,3 +1143,69 @@ is the safer error.
     oneworld"). Added missing paid channel (Sapphire/Ruby purchasable
     access, oneworld_ruby minimum) — same Silver-gated shape as Phase
     21b HEL Finnair Lounge.
+
+---
+
+## 57. FRA JAL Sakura + QR Business Lounge — deleted as demo data (FRA review)
+
+**Risk:** Two pre-baseline FRA lounges (JAL Sakura, Qatar Airways Business
+Lounge) were seeded before the oneworld scrape / manual verification
+process was in place. During the FRA review batch (2026-07), manual
+oneworld.com lookup showed:
+
+  - **JAL Sakura Lounge FRA (id=5)** — NOT on oneworld.com's FRA lounge
+    list. JAL flies FRA (JL407/408 to NRT) but shares Lufthansa Senator
+    Lounge under the LH codeshare arrangement. JAL has no dedicated
+    lounge at FRA.
+  - **Qatar Airways Business Lounge FRA (id=6)** — NOT on oneworld.com's
+    FRA list. QR flies FRA but their oneworld customers access the
+    third-party-operated **Priority Lounge (T2)** whose carrier list
+    includes [QR] (seeded in this same batch as a new Ryhmä 1 entry).
+    QR does not operate its own branded lounge at FRA (unlike hub DOH
+    or outstations like BKK/SIN where they do).
+
+Both entries were incorrect demo data. Impact of the wrong entries:
+false positives — an AY Sapphire or QR/JL Sapphire pax would have been
+told the (nonexistent) lounge was accessible, then find nothing there.
+
+**Action taken:** Both lounges + their channels/rules deleted in FRA
+review patch. Result verified by re-running oneworld.com FRA scrape
+(now 4 real oneworld lounges seeded: Air France/KLM, Primeclass,
+Priority Lounge T2, Priority Lounge T3).
+
+**Rationale for deletion vs. keeping:** wrong data is worse than
+missing data. The user directly confirmed both deletions after the
+audit.
+
+---
+
+## 58. FRA T2 zone inference from gate numbers (partial certainty)
+
+**Risk:** Unlike AMS (where the scrape data explicitly said "Non-Schengen
+Area" and "Schengen Area"), FRA's manual data source did not label
+lounge zones directly. Zone assignments in the FRA review batch were
+INFERRED from gate numbers:
+
+  - **Air France/KLM Lounge (T2, opposite D26-D27)** → non_schengen
+    (D26-D27 are on the non-Schengen side of Terminal 2 per FRA
+    airport map convention)
+  - **Priority Lounge (T2, Gate E9)** → non_schengen (T2 E-gates are
+    all non-Schengen international)
+  - **Priority Lounge (T3, Level 5 Building 602)** → non_schengen
+    (T3 opened as an international-focused terminal)
+  - **Primeclass Lounge (T2, no specific gate)** → schengen (kept from
+    pre-baseline id=22 assignment). Actual location within T2 is
+    unclear from source data.
+
+The inference is standard for FRA passengers but not authoritative.
+Someone visiting on-site could confirm each lounge's actual zone.
+
+**Impact of a wrong zone assignment:** the engine would show a lounge
+as physically_unreachable to some passengers who could actually reach
+it, or vice versa. False negatives (correctly-reachable lounge marked
+unreachable) are the more common failure mode of a mislabeled zone.
+
+**Action needed:** On-site confirmation for FRA lounges. Not blocking.
+Alternative: if a user reports "showed unreachable but I was in the
+same terminal", check the zone assignment first before assuming an
+engine bug.
