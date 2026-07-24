@@ -1,0 +1,37 @@
+{
+  "$schema_note": "Amex Centurion Lounge network snapshot. Not a scrape — manually curated from americanexpress.com/en-us/travel/centurion-lounge on 2026-07-24. Kept in-repo so a future full-network backfill doesn't have to re-source. Each entry is a physical Centurion Lounge; some airports have multiple (MEX). Terminal info from source.",
+  "fetched_at": "2026-07-24",
+  "source_url": "https://www.americanexpress.com/en-us/travel/centurion-lounge",
+  "network_size": 27,
+  "lounges": [
+    { "iata": "ATL", "name": "The Centurion Lounge", "terminal": "Concourse E",                     "region": "US",         "source": "americanexpress.com/travel/centurion-lounge/atl", "fetched_at": "2026-07-24" },
+    { "iata": "CLT", "name": "The Centurion Lounge", "terminal": "Concourse D/E",                   "region": "US",         "source": "americanexpress.com/travel/centurion-lounge/clt", "fetched_at": "2026-07-24" },
+    { "iata": "DFW", "name": "The Centurion Lounge", "terminal": "Terminal D",                      "region": "US",         "source": "americanexpress.com/travel/centurion-lounge/dfw", "fetched_at": "2026-07-24" },
+    { "iata": "DEN", "name": "The Centurion Lounge", "terminal": "Concourse C",                     "region": "US",         "source": "americanexpress.com/travel/centurion-lounge/den", "fetched_at": "2026-07-24" },
+    { "iata": "IAH", "name": "The Centurion Lounge", "terminal": "Terminal D",                      "region": "US",         "source": "americanexpress.com/travel/centurion-lounge/iah", "fetched_at": "2026-07-24" },
+    { "iata": "LAS", "name": "The Centurion Lounge", "terminal": "Concourse D",                     "region": "US",         "source": "americanexpress.com/travel/centurion-lounge/las", "fetched_at": "2026-07-24" },
+    { "iata": "LAX", "name": "The Centurion Lounge", "terminal": "Tom Bradley International Terminal", "region": "US",     "source": "americanexpress.com/travel/centurion-lounge/lax", "fetched_at": "2026-07-24" },
+    { "iata": "MIA", "name": "The Centurion Lounge", "terminal": "Concourse D",                     "region": "US",         "source": "americanexpress.com/travel/centurion-lounge/mia", "fetched_at": "2026-07-24" },
+    { "iata": "JFK", "name": "The Centurion Lounge", "terminal": "Terminal 4",                      "region": "US",         "source": "americanexpress.com/travel/centurion-lounge/jfk", "fetched_at": "2026-07-24" },
+    { "iata": "LGA", "name": "The Centurion Lounge", "terminal": "Terminal B",                      "region": "US",         "source": "americanexpress.com/travel/centurion-lounge/lga", "fetched_at": "2026-07-24" },
+    { "iata": "PHL", "name": "The Centurion Lounge", "terminal": "Terminal A",                      "region": "US",         "source": "americanexpress.com/travel/centurion-lounge/phl", "fetched_at": "2026-07-24" },
+    { "iata": "PHX", "name": "The Centurion Lounge", "terminal": "Terminal 4",                      "region": "US",         "source": "americanexpress.com/travel/centurion-lounge/phx", "fetched_at": "2026-07-24" },
+    { "iata": "SLC", "name": "The Centurion Lounge", "terminal": "Concourse B",                     "region": "US",         "source": "americanexpress.com/travel/centurion-lounge/slc", "fetched_at": "2026-07-24" },
+    { "iata": "SFO", "name": "The Centurion Lounge", "terminal": "Terminal 3",                      "region": "US",         "source": "americanexpress.com/travel/centurion-lounge/sfo", "fetched_at": "2026-07-24" },
+    { "iata": "SEA", "name": "The Centurion Lounge", "terminal": "Central Terminal",                "region": "US",         "source": "americanexpress.com/travel/centurion-lounge/sea", "fetched_at": "2026-07-24" },
+    { "iata": "DCA", "name": "The Centurion Lounge", "terminal": "Terminal 2",                      "region": "US",         "source": "americanexpress.com/travel/centurion-lounge/dca", "fetched_at": "2026-07-24" },
+
+    { "iata": "EZE", "name": "The Centurion Lounge", "terminal": "Terminal 2",                      "region": "International", "source": "americanexpress.com/travel/centurion-lounge/eze", "fetched_at": "2026-07-24" },
+    { "iata": "HKG", "name": "The Centurion Lounge", "terminal": "Terminal 1",                      "region": "International", "source": "americanexpress.com/travel/centurion-lounge/hkg", "fetched_at": "2026-07-24" },
+    { "iata": "LHR", "name": "The Centurion Lounge", "terminal": "Terminal 3",                      "region": "International", "source": "americanexpress.com/travel/centurion-lounge/lhr", "fetched_at": "2026-07-24" },
+    { "iata": "MEL", "name": "The Centurion Lounge", "terminal": "Terminal 2",                      "region": "International", "source": "americanexpress.com/travel/centurion-lounge/mel", "fetched_at": "2026-07-24" },
+    { "iata": "MEX", "name": "The Centurion Lounge (T1)", "terminal": "Terminal 1",                 "region": "International", "source": "americanexpress.com/travel/centurion-lounge/mex-t1", "fetched_at": "2026-07-24" },
+    { "iata": "MEX", "name": "The Centurion Lounge (T2)", "terminal": "Terminal 2",                 "region": "International", "source": "americanexpress.com/travel/centurion-lounge/mex-t2", "fetched_at": "2026-07-24" },
+    { "iata": "MTY", "name": "The Centurion Lounge", "terminal": "Terminal A",                      "region": "International", "source": "americanexpress.com/travel/centurion-lounge/mty", "fetched_at": "2026-07-24" },
+    { "iata": "BOM", "name": "The Centurion Lounge", "terminal": "Terminal 2",                      "region": "International", "source": "americanexpress.com/travel/centurion-lounge/bom", "fetched_at": "2026-07-24" },
+    { "iata": "DEL", "name": "The Centurion Lounge", "terminal": null,                              "region": "International", "source": "americanexpress.com/travel/centurion-lounge/del", "fetched_at": "2026-07-24" },
+    { "iata": "ARN", "name": "The Centurion Lounge", "terminal": null,                              "region": "International", "source": "americanexpress.com/travel/centurion-lounge/arn", "fetched_at": "2026-07-24" },
+    { "iata": "SYD", "name": "The Centurion Lounge", "terminal": "Terminal 1",                      "region": "International", "source": "americanexpress.com/travel/centurion-lounge/syd", "fetched_at": "2026-07-24" },
+    { "iata": "HND", "name": "The Centurion Lounge", "terminal": "Terminal 3",                      "region": "International", "source": "americanexpress.com/travel/centurion-lounge/hnd", "fetched_at": "2026-07-24" }
+  ]
+}

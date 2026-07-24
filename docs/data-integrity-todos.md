@@ -1609,3 +1609,84 @@ via `db/patch-finnair-verified-refresh.ts`.
 **Action needed:** none currently. Price field migration decision
 belongs to a UX-driven PR when the "how much?" question becomes a
 user complaint.
+
+---
+
+## 66. Centurion Lounge network — partial seeding + data gaps
+
+**Seeded in this batch (2026-07-24):** 7 new Centurion Lounges (DFW,
+LAX, MIA, SEA, HKG, MEL, HND) at airports already in the `airports`
+table. Model: single `amex_centurion` channel, no PP/LK/DP (Centurion
+is NOT on the Priority Pass network), no alliance channel. Also
+renamed ARN's "American Express Lounge" → "The Centurion Lounge"
+(same physical lounge, unified branding). JFK + LHR already had
+Centurion pre-baseline.
+
+**Raw network snapshot preserved:** `scripts/data/centurion-lounges.json`
+(27 lounges across 26 IATAs, verified 2026-07-24 from
+americanexpress.com/travel/centurion-lounge). Kept in-repo so a future
+scope expansion doesn't have to re-source.
+
+### Case A — In-scope data gaps (in airports table but unseeded)
+
+Airports in the current scope (in `airports` table) with **zero
+lounges** seeded, despite being real hubs with substantial lounge
+infrastructure. Not a scope question — a **data gap in the current
+scope**. Should be filled by seeding the full lounge set together
+(oneworld + Priority Pass + Centurion etc.), not with a lonely
+single-lounge entry.
+
+  - **MAD** (Madrid — Iberia home hub, oneworld) — completely unseeded
+    despite hosting 5+ major oneworld lounges (IB Velázquez First, IB
+    Dalí T4S, IB T1/T2/T3, AA Admirals Club, plus Sala Cibeles,
+    Puerta de Alcalá, etc.). Biggest visible gap in the DB right now.
+  - **DEL** (Delhi — India's main hub, multiple carriers) — zero
+    lounges despite hosting many operator lounges. Centurion (from
+    this batch's raw data) would apply here too.
+  - **TLV** (Tel Aviv — El Al hub, major connection point) — zero
+    lounges. Not oneworld-served but hosts multiple PP/CIP options.
+
+  **Action:** future backfill batch per airport — seed full lounge set
+  (all channels, all providers) in one PR per hub. Centurion entry for
+  these airports pulls from the raw data file automatically.
+
+### Case B — Legitimate empty airports (no lounge in reality)
+
+~35 airports in the table with zero lounges because they genuinely
+don't have any. Documented sources:
+
+  - **Finnish regional** (15): IVL, JOE, JYV, KAJ, KAO, KEM, KOK,
+    KTT, KUO, MHQ, OUL, RVN, TKU, TMP, VAA — small domestic
+    Finnair-served airports without lounge offerings.
+  - **Baltic small** (2): TAY (Tartu), KUN (Kaunas).
+  - **§59 documented no-lounge / closed** (5): BOO, KKN, TOS, TRD,
+    GZP (Ryhmä 4 investigation results).
+  - **Small leisure / potential PP-only** (~13): ACE, TFN, DBV,
+    SPU, CHQ, JTR, KGS, MJT, BOJ, SOF, PFO, MLA, TIA — seasonal or
+    small operations, may or may not have PP lounges. If seeded,
+    would be pure Ryhmä 4 (PP-only) entries.
+
+  **Action:** none required. Verify individually if a specific
+  user report indicates a lounge missed.
+
+### Case C — Centurion scope expansion (out of scope for now)
+
+16 Centurion Lounge network airports are **not in the airports table**
+because they're primarily US airports Finnair doesn't serve:
+
+  ATL, CLT, DEN, IAH, LAS, LGA, PHL, PHX, SLC, SFO, DCA (US)
+  EZE, MEX, MTY, BOM, SYD (International)
+
+Note MEX has 2 lounges (T1 + T2). Adding these would require:
+  1. Insert 16 rows into `airports` (with proper metadata).
+  2. **Seed each with more than just Centurion** — a lonely
+     Amex-lounge entry at DFW-scale hubs would look absurd. E.g. ATL
+     hosts Delta Sky Club (huge SkyTeam presence), DFW/PHX/CLT are
+     AA hubs with Admirals Club + Flagship, MEX/BOM have local
+     operator lounges.
+
+  **Action:** deferred pending scope decision. The app's current
+  positioning is a Finnair-passenger tool; expanding to a generic
+  Amex-cardholder tool would need product-level consideration.
+  When/if the decision is made, `scripts/data/centurion-lounges.json`
+  is ready to drive the Centurion seeding portion.
