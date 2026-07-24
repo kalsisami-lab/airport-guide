@@ -1632,23 +1632,52 @@ scope expansion doesn't have to re-source.
 Airports in the current scope (in `airports` table) with **zero
 lounges** seeded, despite being real hubs with substantial lounge
 infrastructure. Not a scope question — a **data gap in the current
-scope**. Should be filled by seeding the full lounge set together
-(oneworld + Priority Pass + Centurion etc.), not with a lonely
-single-lounge entry.
+scope**.
 
-  - **MAD** (Madrid — Iberia home hub, oneworld) — completely unseeded
-    despite hosting 5+ major oneworld lounges (IB Velázquez First, IB
-    Dalí T4S, IB T1/T2/T3, AA Admirals Club, plus Sala Cibeles,
-    Puerta de Alcalá, etc.). Biggest visible gap in the DB right now.
-  - **DEL** (Delhi — India's main hub, multiple carriers) — zero
-    lounges despite hosting many operator lounges. Centurion (from
-    this batch's raw data) would apply here too.
-  - **TLV** (Tel Aviv — El Al hub, major connection point) — zero
-    lounges. Not oneworld-served but hosts multiple PP/CIP options.
+**Status (2026-07-24): all three original Case A airports now closed.**
 
-  **Action:** future backfill batch per airport — seed full lounge set
-  (all channels, all providers) in one PR per hub. Centurion entry for
-  these airports pulls from the raw data file automatically.
+  - **DEL** — seeded from existing scrape output (had been scraped
+    but never processed into a batch). 1 oneworld lounge (Encalm
+    Prive). See PR #27.
+  - **TLV** — same root cause as DEL. 2 oneworld lounges (Dan Lounge,
+    Layam Lounge Pier C). See PR #27.
+  - **MAD** — different root cause: never in `scripts/iatas.txt`,
+    so scraper never queried oneworld.com for it. Fixed by adding
+    MAD to iatas.txt + re-running scraper + seeding. **2 oneworld
+    lounges** (Iberia Premium Lounge Dalí T4 schengen + Iberia
+    Premium Lounge Velázquez T4S non_schengen). NOT 5-6 as an
+    earlier memory-based reconstruction had assumed — see rule
+    below.
+
+### 🚨 Rule (adopted 2026-07-24 after MAD reconstruction error)
+
+**Alliance data must not be seeded without a scrape or manual verification
+from the primary source.** During the MAD gap investigation, an earlier
+reconstruction from memory produced a 6-lounge table with fictional
+entries (Velázquez First / Cibeles / Puerta de Alcalá / Sala VIP
+Cervantes / Sala VIP Miró). The actual scrape returned **2 lounges**
+(Dalí + Velázquez, both "Premium Lounge" business-tier). None of the
+6 memory entries matched exactly; several didn't exist at MAD at all
+or were misnamed.
+
+**Root cause of the reconstruction error:** memory-fabricated
+"structural expectations" for a major hub (Iberia hub → surely has
+First lounge + T1/T2 satellites + Aena Sala VIPs) filled the gap
+without evidence.
+
+**Rule going forward:**
+  - Never propose a seed patch from memory. Always source-verify first.
+  - If scraper hasn't run for an airport, add it to iatas.txt and run
+    scraper — don't guess.
+  - If oneworld.com's per-airport page hasn't been manually reviewed
+    for the specific batch, defer classification.
+  - Rule content differences from reconstruction to actual data are
+    often 2-3x factor. Trust the primary source, not the mental model.
+
+### Case B — Legitimate empty airports (no lounge in reality)
+
+~35 airports in the table with zero lounges because they genuinely
+don't have any. Documented sources:
 
 ### Case B — Legitimate empty airports (no lounge in reality)
 
