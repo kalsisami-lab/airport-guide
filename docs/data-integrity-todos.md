@@ -1517,3 +1517,95 @@ promotes 12 existing rules to `alliance_defined`.
 **Action needed:** None. Any new seed script must set tier_semantics
 explicitly for airport service rules (default 'local' is safe but
 under-specifies for oneworld/star/skyteam tier-based rules).
+
+---
+
+## 65. Finnair national exception + price field gap (verified 2026-07-24)
+
+**Verified from primary source** (finnair.com/fi-fi, Finnair Plus
+Silver benefits page, re-checked 2026-07-24):
+
+**Finnair Priority-turvatarkastus (fast track) exception:**
+> "Priority-turvatarkastus: Voit käyttää nopeampaa priority-turva­tarkastus­väylää
+> kun matkustat Finnairin lennoilla (lipussa AY-tunnus ja lento Finnairin
+> tai Norran liikennöimä). Etu on henkilökohtainen."
+
+This confirms the HEL fast_track_security rule id=12 model:
+`min_alliance_tier: 'oneworld_ruby'` + `carrier_restriction: ['AY']` +
+`tier_semantics: 'alliance_defined'`. It's a **national exception** to
+oneworld's default (Sapphire+ only for fast track) — Finnair extends
+the benefit to Finnair Plus Silver holders (ruby-tier) on
+AY-operated flights. The `[AY]` carrier restriction correctly narrows
+this exception to AY-operated (or Norra codeshare AY-flight-number)
+flights only; Silver holders on partner-operated flights don't get
+the exception.
+
+**Pattern implication:** other airlines may have similar
+national-exception fast track rules (BA Executive Club Bronze at LHR?
+IB Plus Plata at MAD?). If a user reports being admitted to fast
+track with a below-Sapphire status, that's a candidate for another
+`alliance_defined + oneworld_ruby + [carrier]` national exception.
+
+**Finnair Lounge zone rule (verbatim, verified):**
+> "Voit käyttää Schengen-puolen Finnair Loungea kun lentosi lähtee
+> Schengen-alueelta, ja non-Schengen-puolen kun lentosi lähtee non-
+> Schengen-alueelta."
+
+Confirms Phase 17 zone logic: lounge id=2 (non_schengen) accessible
+when passenger departs from HEL non-Schengen area; lounge id=3
+(schengen) when Schengen. Zone assignment stands.
+
+**Silver Finnair Lounge paid discount (rules 59, 60):**
+> "30 EUR tai 4 800 Aviosta, vain AY-lennolla, ostettava ennakkoon
+> digitaalisista kanavista."
+
+Model captures: `min_alliance_tier: 'oneworld_ruby'` +
+`carrier_restriction: ['AY']` + `provider: 'paid'` +
+`tier_semantics: 'local'`. Ruby-tier gate ensures only Finnair Silver
+holders (not walk-in strangers) can trigger the paid path.
+
+**Gap: no price field in `lounge_access_rules`.** Schema has:
+```
+min_alliance_tier, carrier_restriction, priority, confidence,
+conditions, source_url, verified_at
+```
+
+Missing: `price_cents`, `price_currency`, `alt_price_units`,
+`alt_price_currency` (Avios). Currently the "30 EUR / 4,800 Avios"
+information is captured only in `source_url` (link to Finnair.com page
+that lists the price). Engine can return `paid_available` but can't
+tell the user the price.
+
+**Migration option (deferred):**
+```sql
+ALTER TABLE lounge_access_rules ADD COLUMN price_cents INTEGER;
+ALTER TABLE lounge_access_rules ADD COLUMN price_currency TEXT;
+ALTER TABLE lounge_access_rules ADD COLUMN alt_price_units INTEGER;   -- e.g. 4800 Avios
+ALTER TABLE lounge_access_rules ADD COLUMN alt_price_currency TEXT;   -- e.g. 'Avios'
+```
+
+All nullable, additive. Engine's `paid_available` status would gain
+optional `price` info returned to UI. Non-breaking to existing rules
+(all `null`).
+
+**Not blocking any current functionality.** Would improve UX: the chip
+could say "Paid — 30 EUR" instead of just "Paid available". If/when
+this is prioritized, the migration is one PR (add columns, extend
+engine result, add UI display), and existing Finnair rules can be
+backfilled from the source page.
+
+**Also NOT modeled:** "ostettava ennakkoon digitaalisista kanavista"
+(must be purchased in advance from digital channels). No way to
+express in engine ("no walk-in at door"). Current model just returns
+`paid_available` without indicating pre-purchase requirement.
+Low priority — walk-in-at-door restrictions are already inconsistent
+across the DB (many `provider='paid'` rules represent both walk-in
+and pre-purchase without distinguishing).
+
+**Action taken:** `verified_at` bumped to 2026-07-24 on all 5 affected
+rules (lounge_access_rules 40, 41, 59, 60 + airport_service_rules 12)
+via `db/patch-finnair-verified-refresh.ts`.
+
+**Action needed:** none currently. Price field migration decision
+belongs to a UX-driven PR when the "how much?" question becomes a
+user complaint.
