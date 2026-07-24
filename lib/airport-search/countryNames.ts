@@ -1,0 +1,54 @@
+// ISO 3166-1 alpha-2 → display country name. Covers every country_code
+// value currently present in the airports table (44 codes). Fallback returns
+// the raw ISO2 for unknown codes so display is always non-empty.
+
+const COUNTRY_NAMES: Record<string, string> = {
+  AE: 'UAE',
+  AL: 'Albania',
+  AT: 'Austria',
+  AU: 'Australia',
+  BE: 'Belgium',
+  BG: 'Bulgaria',
+  CA: 'Canada',
+  CH: 'Switzerland',
+  CN: 'China',
+  CY: 'Cyprus',
+  CZ: 'Czech Republic',
+  DE: 'Germany',
+  DK: 'Denmark',
+  EE: 'Estonia',
+  ES: 'Spain',
+  FI: 'Finland',
+  FR: 'France',
+  GB: 'United Kingdom',
+  GR: 'Greece',
+  HK: 'Hong Kong',
+  HR: 'Croatia',
+  HU: 'Hungary',
+  IE: 'Ireland',
+  IL: 'Israel',
+  IN: 'India',
+  IS: 'Iceland',
+  IT: 'Italy',
+  JP: 'Japan',
+  KR: 'South Korea',
+  LT: 'Lithuania',
+  LU: 'Luxembourg',
+  LV: 'Latvia',
+  MT: 'Malta',
+  NL: 'Netherlands',
+  NO: 'Norway',
+  PL: 'Poland',
+  PT: 'Portugal',
+  QA: 'Qatar',
+  SE: 'Sweden',
+  SG: 'Singapore',
+  SI: 'Slovenia',
+  TH: 'Thailand',
+  TR: 'Turkey',
+  US: 'United States',
+};
+
+export function countryNameFor(iso2: string): string {
+  return COUNTRY_NAMES[iso2.toUpperCase()] ?? iso2.toUpperCase();
+}
