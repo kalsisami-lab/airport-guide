@@ -67,6 +67,17 @@ export const airports = sqliteTable('airports', {
   name:        text('name').notNull(),
   city:        text('city').notNull(),
   countryCode: text('country_code').notNull(),  // ISO 3166-1 alpha-2
+  // Lounge-coverage assertion for this airport (§67). Distinguishes
+  // "we've verified there are no lounges here" from "we haven't seeded
+  // any lounges here yet" — the empty-lounges list is otherwise identical
+  // for both. Default 'unverified' preserves existing semantics until an
+  // explicit verification is recorded (same source-required rigor as a
+  // lounge row per §66).
+  loungeCoverageStatus: text('lounge_coverage_status', {
+    enum: ['verified_none', 'verified_seeded', 'unverified'],
+  }).notNull().default('unverified'),
+  coverageVerifiedAt:   text('coverage_verified_at'),
+  coverageSourceUrl:    text('coverage_source_url'),
 });
 
 export const terminals = sqliteTable('terminals', {

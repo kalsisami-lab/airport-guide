@@ -111,17 +111,32 @@ function makeServiceRule(overrides: Partial<AirportServiceRuleInput> = {}): Airp
   };
 }
 
+type CoverageOverride = {
+  status:     'verified_none' | 'verified_seeded' | 'unverified';
+  verifiedAt?: string;
+  sourceUrl?:  string;
+};
+
 function makeAirportRepo(
   loungesMap: Record<string, LoungeInputWithMeta[]>,
   serviceRulesMap: Partial<Record<string, Partial<Record<ServiceType, AirportServiceRuleInput[]>>>> = {},
   countryMap: Record<string, string> = {},
+  coverageMap: Record<string, CoverageOverride> = {},
 ): AirportRepository {
   return {
     getLoungesAtAirport:    (iata) => loungesMap[iata] ?? [],
     getAirportServiceRules: (iata, serviceType) => serviceRulesMap[iata]?.[serviceType] ?? [],
     getAirportInfo:         (iata): AirportInfo | null => {
       const cc = countryMap[iata];
-      return cc ? { countryCode: cc, isSchengen: isSchengenCountry(cc) } : null;
+      if (!cc) return null;
+      const cov = coverageMap[iata];
+      return {
+        countryCode:          cc,
+        isSchengen:           isSchengenCountry(cc),
+        loungeCoverageStatus: cov?.status ?? 'unverified',
+        coverageVerifiedAt:   cov?.verifiedAt ?? null,
+        coverageSourceUrl:    cov?.sourceUrl ?? null,
+      };
     },
   };
 }
@@ -381,5 +396,66 @@ describe('findEntitlementsAtAirport', () => {
     assert.equal(result.passenger.marketingCarrier,  'IB');
     assert.equal(result.passenger.operatingAlliance, 'oneworld');
     assert.equal(result.passenger.cabin,             'business');
+  });
+
+  // ── §67 lounge coverage propagation ─────────────────────────────────────────
+
+  describe('§67 lounge coverage', () => {
+    const baseFlight: FlightRequest = {
+      operatingCarrier: 'AY',
+      cabin:            'economy',
+      departureAirport: 'BOO',
+      arrivalAirport:   'HEL',
+    };
+    const emptyUser: UserInput = { statusCards: [] };
+
+    test('verified_none airport propagates coverage to output', () => {
+      const repos: Repos = {
+        airlines: airlineRepo,
+        tiers:    tierRepo,
+        airport:  makeAirportRepo(
+          { BOO: [] },
+          {},
+          { BOO: 'NO', HEL: 'FI' },
+          { BOO: { status: 'verified_none', verifiedAt: '2026-07-24', sourceUrl: 'https://example/59' } },
+        ),
+      };
+      const result = findEntitlementsAtAirport(emptyUser, baseFlight, repos, { now: NOW });
+
+      assert.equal(result.lounges.length, 0);
+      assert.equal(result.coverage?.status,     'verified_none');
+      assert.equal(result.coverage?.verifiedAt, '2026-07-24');
+      assert.equal(result.coverage?.sourceUrl,  'https://example/59');
+    });
+
+    test('unverified airport returns coverage.status=unverified (default)', () => {
+      const repos: Repos = {
+        airlines: airlineRepo,
+        tiers:    tierRepo,
+        airport:  makeAirportRepo(
+          { MAD: [] },
+          {},
+          { MAD: 'ES', HEL: 'FI' },
+        ),
+      };
+      const flight: FlightRequest = { ...baseFlight, departureAirport: 'MAD' };
+      const result = findEntitlementsAtAirport(emptyUser, flight, repos, { now: NOW });
+
+      assert.equal(result.coverage?.status,     'unverified');
+      assert.equal(result.coverage?.verifiedAt, null);
+      assert.equal(result.coverage?.sourceUrl,  null);
+    });
+
+    test('unknown departure IATA (not in airports table) → coverage is null', () => {
+      const repos: Repos = {
+        airlines: airlineRepo,
+        tiers:    tierRepo,
+        airport:  makeAirportRepo({}, {}, { HEL: 'FI' }),
+      };
+      const flight: FlightRequest = { ...baseFlight, departureAirport: 'ZZZ' };
+      const result = findEntitlementsAtAirport(emptyUser, flight, repos, { now: NOW });
+
+      assert.equal(result.coverage, null);
+    });
   });
 });

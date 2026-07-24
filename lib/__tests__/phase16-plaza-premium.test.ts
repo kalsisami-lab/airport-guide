@@ -50,7 +50,13 @@ function makeAirportRepo(lounges: LoungeInputWithMeta[]): AirportRepository {
     getAirportServiceRules: () => [],
     getAirportInfo: (iata): AirportInfo | null => {
       const cc = AIRPORT_COUNTRY[iata];
-      return cc ? { countryCode: cc, isSchengen: isSchengenCountry(cc) } : null;
+      return cc ? {
+        countryCode:          cc,
+        isSchengen:           isSchengenCountry(cc),
+        loungeCoverageStatus: 'unverified',
+        coverageVerifiedAt:   null,
+        coverageSourceUrl:    null,
+      } : null;
     },
   };
 }

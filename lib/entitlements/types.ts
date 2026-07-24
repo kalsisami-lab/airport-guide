@@ -71,6 +71,20 @@ export type { AirportServiceRuleInput, ServiceType };
 export interface AirportInfo {
   countryCode: string;   // ISO 3166-1 alpha-2
   isSchengen:  boolean;
+  // §67 lounge-coverage assertion for this airport. Defaults to 'unverified'
+  // for any airport row that hasn't been explicitly verified.
+  loungeCoverageStatus: 'verified_none' | 'verified_seeded' | 'unverified';
+  coverageVerifiedAt:   string | null;
+  coverageSourceUrl:    string | null;
+}
+
+// Coverage descriptor surfaced on AirportEntitlements. `null` when the
+// departure airport IATA is not in the airports table at all — that is a
+// distinct case from a known airport with unverified coverage.
+export interface LoungeCoverage {
+  status:     'verified_none' | 'verified_seeded' | 'unverified';
+  verifiedAt: string | null;
+  sourceUrl:  string | null;
 }
 
 export interface AirportRepository {
@@ -108,6 +122,11 @@ export interface AirportEntitlements {
   status:           StatusContext | null;
   lounges:          LoungeEntitlement[];
   services:         Record<ServiceType, AccessResult>;
+  // §67 coverage for the departure airport. `null` when the IATA is not in
+  // the airports table (distinct from `{status: 'unverified'}` for a known
+  // but unverified airport). UI uses this to distinguish "verified no
+  // lounges here" from "no lounges seeded / we don't know yet".
+  coverage:         LoungeCoverage | null;
   // Backward-compatible fields derived from services — will be removed when UI is updated.
   fastTrack:        FastTrackResult;
   priorityBoarding: PriorityBoardingResult;
