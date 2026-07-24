@@ -846,14 +846,40 @@ export default function Dashboard() {
               </div>
             )}
 
+            {/* §67 empty-state — coverage-aware so "verified no lounges" reads
+                differently from "we haven't seeded data yet". Same UI slot in
+                both cases so downstream layout is stable. */}
             {entitlements && entitlements.lounges.length === 0 && (
-              <div className="rounded-2xl bg-slate-800/60 border border-slate-700/60 p-6 text-center">
-                <div className="text-3xl mb-2">🚫</div>
-                <p className="text-slate-300 font-medium">No lounge access found</p>
-                <p className="text-slate-500 text-sm mt-1">
-                  Try adding a Priority Pass card or a qualifying airline status
-                </p>
-              </div>
+              entitlements.coverage?.status === 'verified_none' ? (
+                <div className="rounded-2xl bg-slate-800/60 border border-slate-700/60 p-6 text-center">
+                  <div className="text-3xl mb-2">🛑</div>
+                  <p className="text-slate-300 font-medium">No lounges at this airport</p>
+                  <p className="text-slate-500 text-sm mt-1">
+                    Verified: this airport has no lounge offering
+                    {entitlements.coverage.verifiedAt ? ` (${entitlements.coverage.verifiedAt})` : ''}.
+                  </p>
+                  {entitlements.coverage.sourceUrl && (
+                    <a
+                      href={entitlements.coverage.sourceUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-2 inline-block text-xs text-blue-400 hover:text-blue-300 underline underline-offset-2"
+                    >
+                      Source
+                    </a>
+                  )}
+                </div>
+              ) : (
+                <div className="rounded-2xl bg-slate-800/60 border border-slate-700/60 p-6 text-center">
+                  <div className="text-3xl mb-2">❓</div>
+                  <p className="text-slate-300 font-medium">Lounge data not available</p>
+                  <p className="text-slate-500 text-sm mt-1">
+                    We haven&apos;t verified lounge coverage for this airport yet — there may
+                    or may not be lounges here. Try a Priority Pass card or airline status
+                    for known networks.
+                  </p>
+                </div>
+              )
             )}
 
             {airportIata && !card && !status && entitlements && entitlements.lounges.length > 0 && (

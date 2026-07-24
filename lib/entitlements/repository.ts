@@ -100,12 +100,23 @@ export function createAirportRepository(): AirportRepository {
 
     getAirportInfo(iataCode: string): AirportInfo | null {
       if (airportInfoCache.has(iataCode)) return airportInfoCache.get(iataCode)!;
-      const row = db.select({ countryCode: airports.countryCode })
+      const row = db.select({
+          countryCode:          airports.countryCode,
+          loungeCoverageStatus: airports.loungeCoverageStatus,
+          coverageVerifiedAt:   airports.coverageVerifiedAt,
+          coverageSourceUrl:    airports.coverageSourceUrl,
+        })
         .from(airports)
         .where(eq(airports.iataCode, iataCode))
         .get();
-      const info = row
-        ? { countryCode: row.countryCode, isSchengen: isSchengenCountry(row.countryCode) }
+      const info: AirportInfo | null = row
+        ? {
+            countryCode:          row.countryCode,
+            isSchengen:           isSchengenCountry(row.countryCode),
+            loungeCoverageStatus: row.loungeCoverageStatus,
+            coverageVerifiedAt:   row.coverageVerifiedAt ?? null,
+            coverageSourceUrl:    row.coverageSourceUrl ?? null,
+          }
         : null;
       airportInfoCache.set(iataCode, info);
       return info;

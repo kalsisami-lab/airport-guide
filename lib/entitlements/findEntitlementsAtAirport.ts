@@ -6,6 +6,7 @@ import type {
   AirportEntitlements,
   FastTrackResult,
   FlightRequest,
+  LoungeCoverage,
   LoungeEntitlement,
   LoungeInputWithMeta,
   PriorityBoardingResult,
@@ -88,11 +89,24 @@ export function findEntitlementsAtAirport(
   const fastTrack:        FastTrackResult        = toAvailableResult(airportServices.services.fast_track_security);
   const priorityBoarding: PriorityBoardingResult = toAvailableResult(airportServices.services.priority_boarding);
 
+  // §67 coverage assertion for the departure airport. `null` when the IATA
+  // is unknown (not in airports table); a known airport with no explicit
+  // verification still returns a coverage object with status='unverified'.
+  const departureInfo = repos.airport.getAirportInfo(flight.departureAirport);
+  const coverage: LoungeCoverage | null = departureInfo
+    ? {
+        status:     departureInfo.loungeCoverageStatus,
+        verifiedAt: departureInfo.coverageVerifiedAt,
+        sourceUrl:  departureInfo.coverageSourceUrl,
+      }
+    : null;
+
   return {
     passenger,
     status,
     lounges,
     services:         airportServices.services,
+    coverage,
     fastTrack,
     priorityBoarding,
     evaluatedAt:      now.toISOString(),

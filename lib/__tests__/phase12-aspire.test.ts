@@ -76,7 +76,13 @@ function makeAirportRepo(
     getAirportServiceRules: ()     => [],
     getAirportInfo:         (iata): AirportInfo | null => {
       const cc = countryMap[iata];
-      return cc ? { countryCode: cc, isSchengen: isSchengenCountry(cc) } : null;
+      return cc ? {
+        countryCode:          cc,
+        isSchengen:           isSchengenCountry(cc),
+        loungeCoverageStatus: 'unverified',
+        coverageVerifiedAt:   null,
+        coverageSourceUrl:    null,
+      } : null;
     },
   };
 }

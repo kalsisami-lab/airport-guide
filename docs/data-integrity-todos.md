@@ -1719,3 +1719,118 @@ Note MEX has 2 lounges (T1 + T2). Adding these would require:
   Amex-cardholder tool would need product-level consideration.
   When/if the decision is made, `scripts/data/centurion-lounges.json`
   is ready to drive the Centurion seeding portion.
+
+---
+
+## 67. Lounge coverage is a per-airport claim requiring a source
+
+**Risk (fixed for Case B §66 subset):** the engine previously could not
+distinguish two airports that both had zero lounge rows:
+
+  - **(a) Verified no lounges in reality** — e.g. small regional
+    airports with no lounge infrastructure at all (BOO, KKN, TOS per
+    §59 (a)). Correct answer: "there is no lounge here."
+  - **(b) Unseeded / unknown** — an airport in the `airports` table
+    that no batch has covered yet, or a hub where lounges genuinely
+    exist but we have not verified any of them (e.g. MAD before the
+    2026-07-24 scrape). Correct answer: "we do not know."
+
+Before this fix the UI treated both as an empty state with the same
+message ("No lounge access found — try Priority Pass or airline
+status"), which was silently wrong for (a) and misleading for (b).
+Same class of bug as §63/§64 for airport services: silence conflated
+with certainty.
+
+**Fix:** three columns on `airports`:
+
+  - `lounge_coverage_status` ('verified_none' | 'verified_seeded'
+    | 'unverified', default 'unverified')
+  - `coverage_verified_at` (ISO date, nullable)
+  - `coverage_source_url` (nullable)
+
+Engine returns a `coverage` object on `AirportEntitlements`; UI shows
+a distinct empty-state message for `verified_none` (with source link)
+vs `unverified + empty` (honest "we don't know yet") vs the normal
+seeded case with lounges listed.
+
+**Migration:** `db/migrations/0003_brown_cerebro.sql` adds the three
+columns; every existing airport row backfills to `'unverified'`, so
+no behavior changes without an explicit verification.
+
+### The rule
+
+> A change to `lounge_coverage_status` is a per-airport claim about
+> the world. It requires a source with the same rigor as adding a
+> lounge row per §66 — a scrape, a primary-source URL, or manual
+> verification. Never mark an airport `verified_none` because
+> "probably no lounges" or "seems unlikely" or by memory-reconstructed
+> lists. If the source is not on hand, the row stays `unverified`.
+
+This mirrors the §66 rule that alliance/lounge data must not be
+seeded from memory. The empty-lounges list of an unverified airport
+is honest ("we don't know"); a false `verified_none` is a confident
+lie that ships in the UI.
+
+### Initial seeded rows (2026-07-24)
+
+`db/patch-coverage-verified-none-59.ts` sets three airports to
+`verified_none`, sourced from §59 (a):
+
+  - **BOO** Bodø
+  - **KKN** Kirkenes
+  - **TOS** Tromsø
+
+### Explicit non-verified_none exceptions from §59
+
+Two airports appear in Case B (§66) alongside BOO/KKN/TOS but are
+deliberately **not** `verified_none` — the underlying situation is
+structurally different:
+
+  - **GZP** Gazipaşa-Alanya — §59 (b): the CIP lounge is **closed**,
+    not absent. Same §39-style deferral shape as RHO/PRG/NRT/EDI.
+    The lounge infrastructure exists; it just isn't operating. Marking
+    this `verified_none` would misrepresent the airport. Stays
+    `unverified`; re-evaluate if the lounge reopens.
+  - **TRD** Trondheim Værnes — §59 (c): a **SAS lounge exists** at
+    both Terminal A and Terminal B, but access is Star Alliance /
+    SkyTeam only and the lounge is not on Priority Pass. There is a
+    working lounge; it is simply outside this app's oneworld-centric
+    scope. Marking this `verified_none` would deny the existence of a
+    real lounge. Stays `unverified`; re-evaluate if TRD ever gains
+    oneworld carriers (not imminent).
+
+### Deferred verification batches
+
+The remaining Case B airports stay `unverified` until each batch has
+per-airport source verification. **Do not bulk-flip.**
+
+  - **Finnish regional (15)**: IVL, JOE, JYV, KAJ, KAO, KEM, KOK,
+    KTT, KUO, MHQ, OUL, RVN, TKU, TMP, VAA. Verifiable via
+    finavia.fi per-airport pages. Own batch.
+  - **Baltic small (2)**: TAY (Tartu), KUN (Kaunas). Verifiable via
+    respective airport websites. Own batch.
+  - **Small leisure / potential PP-only (13)**: ACE, TFN, DBV, SPU,
+    CHQ, JTR, KGS, MJT, BOJ, SOF, PFO, MLA, TIA. §66 Case B lists
+    these as "may or may not have PP lounges" — that phrasing is
+    itself an admission that they are unverified. Do **not** promote
+    any of these to `verified_none` from memory; only via
+    per-airport primary-source check.
+
+### `verified_seeded` — not yet used
+
+The third enum value is retained for a future pass that asserts "this
+airport's lounge coverage has been actively re-verified from primary
+sources, and the seeded rows are complete for the current snapshot."
+No rows use `verified_seeded` today. It exists so a later verification
+sweep does not require another migration.
+
+### Action needed
+
+  - Per-batch verification passes for the Finnish regional, Baltic,
+    and leisure buckets. Each batch is its own PR with per-airport
+    source URLs.
+  - If a user reports a lounge at any `verified_none` airport, treat
+    it as a factual claim requiring investigation: the reporter has
+    (weak) primary-source evidence and the current row's source may
+    be stale or wrong. Do not simply flip the row — investigate
+    first, then update with new source.

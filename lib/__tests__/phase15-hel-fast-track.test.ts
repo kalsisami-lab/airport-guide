@@ -65,7 +65,13 @@ function makeAirportRepo(): AirportRepository {
     getAirportServiceRules: (_iata: string, svc: ServiceType) =>
       svc === 'fast_track_security' ? HEL_FT_RULES : [],
     getAirportInfo: (iata): AirportInfo | null =>
-      iata === 'HEL' ? { countryCode: 'FI', isSchengen: isSchengenCountry('FI') } : null,
+      iata === 'HEL' ? {
+        countryCode:          'FI',
+        isSchengen:           isSchengenCountry('FI'),
+        loungeCoverageStatus: 'unverified',
+        coverageVerifiedAt:   null,
+        coverageSourceUrl:    null,
+      } : null,
   };
 }
 

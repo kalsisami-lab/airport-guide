@@ -53,7 +53,13 @@ function makeAirportRepo(lounges: LoungeInputWithMeta[]): AirportRepository {
     getLoungesAtAirport: (iata) => (iata === 'HEL' ? lounges : []),
     getAirportServiceRules: () => [],
     getAirportInfo: (iata): AirportInfo | null =>
-      iata === 'HEL' ? { countryCode: 'FI', isSchengen: isSchengenCountry('FI') } : null,
+      iata === 'HEL' ? {
+        countryCode:          'FI',
+        isSchengen:           isSchengenCountry('FI'),
+        loungeCoverageStatus: 'unverified',
+        coverageVerifiedAt:   null,
+        coverageSourceUrl:    null,
+      } : null,
   };
 }
 
