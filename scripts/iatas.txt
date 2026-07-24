@@ -58,3 +58,4 @@ SVG
 TRD
 TOS
 KEF
+MAD
