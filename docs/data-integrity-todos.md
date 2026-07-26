@@ -2171,3 +2171,10 @@ written, it must treat `internal-ref:` as a legitimate source (same as
 - **Enforcement script recognition of `internal-ref:` prefix**: if any
   script checks source_url validity, it must treat `internal-ref:` as
   legitimate (not placeholder).
+- **Pre-existing NULL source_url on 3 fast_track_security rows** (found
+  during §68 QA, 2026-07-26): HEL id=2 (star_gold), HEL id=3
+  (skyteam_elite_plus), FRA id=5 (star_gold). All three predate the
+  source_url discipline established mid-project. Not this PR's fault
+  (all §68 rows have `internal-ref:` sources), but exactly the kind of
+  drift a source_url enforcement script would surface. Own PR — either
+  find primary sources or delete if unsupported.
