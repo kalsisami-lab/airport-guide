@@ -701,6 +701,20 @@ lounge listings. If PP-lounges exist, seed them in a PP-only batch
 following the AGP Sala VIP shape (no alliance_status channel — clean
 negative case for oneworld access).
 
+**Additional deferrals from §66 Case C oneworld batch (2026-07-26):**
+
+  - **DCA** "American Airlines Admirals Club - Concourse D - Temporarily
+    closed for renovations." — closed per oneworld.com. Watch for
+    reopening.
+  - **EZE** "LATAM VIP Lounge TEMPORARILY CLOSED" — closed per
+    oneworld.com. Watch for reopening.
+
+Both use the same §39 shape: oneworld.com lists the lounge in the
+airport's results but with "temporarily closed" wording embedded in
+the title. Not seeded; watch the source for reopening. MTY is a
+separate case (broken lounge name in oneworld.com's DOM, not a
+closure) — see §66 Case C rough-edges list.
+
 ---
 
 ## 40. Portuguese + Italian lounge opening hours unknown (Phase 28)
@@ -1721,25 +1735,116 @@ The patch also added **MX** (Mexico) and **AR** (Argentina) to
 `lib/airport-search/countryNames.ts` — first appearance of these ISO2
 codes in the DB.
 
-### Case C — what this seeding deliberately does NOT do
+### Case C — oneworld layer seeded 2026-07-26
 
-**No non-Centurion lounges were seeded.** ATL has a large Delta Sky Club
-presence, DFW/PHX/CLT are AA hubs with Admirals Club + Flagship, SYD is
-QF's flagship (multiple oneworld First/Business lounges), BOM has JAL /
-CX / QR oneworld lounges. None of that data lives in
-`scripts/output/oneworld-lounges.json` because none of these IATAs are
-in `scripts/iatas.txt`, and there is no scraper for Star Alliance or
-SkyTeam at all.
+**Status:** oneworld-reciprocal lounges seeded for the 16 Case C airports
+as of 2026-07-26 via `db/patch-oneworld-case-c-16-airports.ts`. Data
+sourced strictly from `scripts/output/oneworld-lounges.json` (re-scraped
+2026-07-26 with the `accessPolicyText` extension so §51 wording drives
+classification — see next subsection). No memory-reconstructed rows.
 
-Attempting to seed those from memory would be exactly the §66 bug the
-MAD incident exposed. Two structurally different follow-ups:
+**IATAs re-scraped (16, same set as the Centurion patch):**
+ATL, CLT, DCA, DEN, IAH, LAS, LGA, PHL, PHX, SFO, SLC (US);
+BOM, EZE, MEX, MTY, SYD (international).
 
-  - **oneworld coverage for these 16 IATAs** — own future PR: add
-    IATAs to `scripts/iatas.txt`, rerun `scrape-oneworld-lounges.ts`,
-    seed the results. Sourced, so allowed under §66.
-  - **Star Alliance / SkyTeam coverage** — permanently out of scope.
-    No data source exists in this repo and the app is oneworld/Finnair-
-    centric. Not planned.
+**Per-IATA lounge yield from oneworld.com:**
+
+  | IATA | Ryhmä 2 (any oneworld) | Ryhmä 1 (these only) | Deferred | Seeded |
+  |------|-----------------------:|---------------------:|---------:|-------:|
+  | ATL  | 1 | 1 | 0 | 2 |
+  | CLT  | 3 | 0 | 0 | 3 |
+  | DCA  | 2 | 0 | 1 (temp closed) | 2 |
+  | DEN  | 1 | 1 | 0 | 2 |
+  | IAH  | 1 | 2 | 0 | 3 |
+  | LAS  | 0 | 1 | 0 | 1 |
+  | LGA  | 1 | 0 | 0 | 1 |
+  | PHL  | 4 | 1 | 0 | 5 |
+  | PHX  | 3 | 1 | 0 | 4 |
+  | SFO  | 4 | 0 | 0 | 4 |
+  | SLC  | — | — | — | 0 (see below) |
+  | BOM  | 0 | 1 | 0 | 1 |
+  | EZE  | 1 | 1 | 1 (temp closed) | 2 |
+  | MEX  | 1 | 0 | 0 | 1 |
+  | MTY  | 0 | 0 | 1 (broken name) | 0 |
+  | SYD  | 4 | 3 | 0 | 7 |
+  | **Total** | **26** | **11** | **3** | **38** |
+
+(One row is counted 26 + 11 = 37 in the wording column and 38 in the
+seed column; the SYD "Qantas International First" row has an emerald-tier
+label alone → same all_alliance model but §52 OR-tier at emerald, still
+Ryhmä 2 in the seeded count.)
+
+**SLC — no oneworld reciprocity (source-verified empty):** oneworld.com's
+page rendered the `.lounges-list__no-results` placeholder for SLC
+("No lounges were found for this airport. Please try a different
+airport."). That is a positive source assertion of no oneworld reciprocal
+lounge — not evidence of no lounges at all (SLC is a Delta hub with
+major Sky Club presence + a Centurion that is already seeded). Per §67
+`lounge_coverage_status` stays `unverified` — an oneworld-scrape hit
+verifies oneworld reciprocity, not full inventory. Semantics of the
+scrape are recorded here so the fact doesn't vanish when
+`scripts/output/oneworld-lounges.json` is overwritten by the next
+scrape run.
+
+**§36 (AY-lisäys) — checked and does NOT apply to any of the 16:**
+verification ran against the airports table seeded by
+`db/seed-finnair-airports.ts` (Phase 20, 128 direct Finnair destinations
+in 2026). None of the 16 Case C IATAs matches. **Caveat:** the check
+covers direct Finnair-operated routes only. Codeshare-only presence
+(AY flight numbers on QR / IB / AA operated flights, which could land
+in BOM / EZE / MEX / etc.) is not in that dataset. If codeshare route
+data is ever added to the repo, this §36 check must be re-run against
+the 16 Case C IATAs — a codeshare hit would flip §36 for that airport
+and require AY-lisäys on all Ryhmä 1 lounges there.
+
+**§51 wording capture — scraper extended in this PR.** The `LoungeRecord`
+type now carries `accessPolicyText`, populated from
+`.lounge-details__airlines li.conditions`. Two canonical wordings drive
+classification:
+
+  - `Access for eligible customers traveling on any oneworld member airline.` → Ryhmä 2 (all_alliance)
+  - `Access for eligible customers traveling on these oneworld member airlines only.` → Ryhmä 1 (carrier_specific)
+
+Any other value (or `null`) means the DOM structure changed and the
+lounge needs manual review before seeding. All 41 lounges in this batch
+returned one of the two canonical values (0 nulls, 0 unknowns).
+
+The wording extension closes the §51 audit gap for **all future** scrape
+runs, not just this batch. Prior batches (3a–3f) predate the extension
+and still classify by name via `classify-lounges.ts`. Re-scraping them
+against the extended scraper is a separate cleanup PR — recorded in §51
+as the retroactive audit.
+
+### Case C — deliberate non-scope
+
+**No non-oneworld lounges beyond Centurion were seeded.** ATL has a
+large Delta Sky Club presence, DFW/PHX/CLT are AA hubs with additional
+paid / operator lounges, SYD has multiple non-oneworld lounges, BOM has
+airline-specific operator lounges. None of that data exists in a
+primary source that lives in this repo:
+
+  - Priority Pass / LoungeKey / DragonPass network listings for these
+    16 airports have not been scraped. Adding PP / LK / DP channels to
+    the seeded oneworld lounges would be an unsourced inference —
+    forbidden under §66. Coverage stays `unverified` so the UI honestly
+    signals "we know the oneworld + Centurion picture; other paths not
+    verified."
+  - **Star Alliance / SkyTeam** — permanently out of scope. No scraper
+    exists for those alliances, no data source in the repo, and the
+    app is oneworld/Finnair-centric.
+
+### Case C — per-alliance coverage table (deliberate deferral)
+
+If a Star Alliance or SkyTeam scraper is ever built (currently no plan
+to), a **per-alliance coverage table** would be the correct data model —
+something like `airport_alliance_coverage (airport_id, alliance, status,
+verified_at, source_url)`. That would let the engine and UI express
+partial coverage precisely ("oneworld verified, SkyTeam unverified")
+rather than the current single `lounge_coverage_status` which is
+alliance-agnostic. This has been considered and deliberately deferred:
+one-alliance scraper does not justify the schema + engine + UI changes.
+A future session encountering multi-alliance scraping should treat this
+paragraph as the design decision to revisit, not to rediscover.
 
 ### Case C — remaining rough edges
 
@@ -1749,11 +1854,36 @@ MAD incident exposed. Two structurally different follow-ups:
       - **SYD**: city = "Sydney (Mascot)"
     Trusting the primary source over local cleanup per §66. If either
     is a UX problem, fix at the render layer, not by mutating rows.
-  - No `terminals` rows created for these 16 airports. Centurion rules
-    are gate-agnostic (no terminal restriction on access), so this
-    doesn't affect correctness. If a future oneworld batch for the
-    same IATAs needs terminal filtering (§45), add terminals at that
-    point.
+  - No `terminals` rows created for these 16 airports. Centurion +
+    oneworld rules are gate-agnostic (no terminal restriction on
+    access), so this doesn't affect correctness. If terminal filtering
+    (§45) becomes relevant for these IATAs, add terminals at that point.
+  - **§39 deferrals from this batch (3 lounges), pending reopening or
+    upstream fix:**
+      - **DCA** "American Airlines Admirals Club - Concourse D -
+        Temporarily closed for renovations." — closed. Watch for
+        reopening on oneworld.com.
+      - **EZE** "LATAM VIP Lounge TEMPORARILY CLOSED" — closed. LATAM
+        left oneworld years ago but retains a physical lounge; oneworld.com
+        still lists it as an eligible venue. Watch for reopening.
+      - **MTY** — oneworld.com's page renders the lounge title element
+        with only the text "MTY" (i.e., the IATA code, not a real
+        lounge name). The scraper faithfully captures what's there.
+        Not a scraper bug. Defer until oneworld.com publishes a real
+        name for this Iberia-only lounge.
+
+### Case C — HA (Hawaiian Airlines) mapping gap
+
+Surfaced by SYD "The House" scrape: oneworld.com lists "Hawaiian
+Airlines" as an eligible carrier, but `scrape-oneworld-lounges.ts`
+CARRIER_MAP does not include HA even though Hawaiian recently joined
+oneworld. The BA mapping in the same lounge is intact, so no lounge
+was dropped from this batch — but any future lounge that lists HA as
+its **only** eligible carrier would be miscategorized. Fix is a
+one-line addition to CARRIER_MAP, but that changes the mapping for the
+whole scrape output and needs a full re-scrape to observe downstream
+effects. **Recorded as an explicit follow-up PR** — do not fix in a
+lounge-seed batch.
 
 ---
 

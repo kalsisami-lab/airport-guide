@@ -39,6 +39,12 @@ interface LoungeRecord {
   openingHours: Record<string, string[]>;   // { Monday: ['06:00 - 23:00'], ... }
   zone:         'schengen' | 'non_schengen' | null;
   disclaimer:   string | null;
+  // §51 wording captured verbatim from `.lounge-details__airlines li.conditions`.
+  // Two canonical values seen so far:
+  //   "Access for eligible customers traveling on any oneworld member airline."   → Ryhmä 2 all_alliance
+  //   "Access for eligible customers traveling on these oneworld member airlines only." → Ryhmä 1 carrier_specific
+  // Any other wording (or null) means the page structure changed and needs manual review.
+  accessPolicyText: string | null;
 }
 
 interface AirportRecord {
@@ -128,6 +134,10 @@ async function extractLoungesFromPage(page: Page): Promise<LoungeRecord[]> {
         var discEl = card.querySelector('.lounge__disclaimer');
         var disclaimer = clean(discEl && discEl.textContent) || null;
 
+        // §51 wording: read from li.conditions inside the airlines block.
+        var apEl = card.querySelector('.lounge-details__airlines li.conditions');
+        var accessPolicyText = clean(apEl && apEl.textContent) || null;
+
         return {
           name: name,
           subtitle: subtitle,
@@ -140,6 +150,7 @@ async function extractLoungesFromPage(page: Page): Promise<LoungeRecord[]> {
           openingHours: openingHours,
           zone: zone,
           disclaimer: disclaimer,
+          accessPolicyText: accessPolicyText,
         };
       });
     })
