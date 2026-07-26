@@ -1999,3 +1999,175 @@ sweep does not require another migration.
     (weak) primary-source evidence and the current row's source may
     be stale or wrong. Do not simply flip the row — investigate
     first, then update with new source.
+
+---
+
+## 68. Fast track backfill — Finnair-source, oneworld branch (2026-07-26)
+
+**Status:** 58 airports seeded via
+`db/patch-fast-track-finnair-oneworld-backfill.ts`. All data sourced from
+Finnair's priority-turvatarkastus page (user-pasted manual copy —
+`internal-ref:finnair-priority-turvatarkastus/2026-07-26`; the live
+`finnair.com/fi/fi/finnair-plus/tietoa-ohjelmasta/edut` URL returned 404
+at fetch time, see §65 stale-URL TODO).
+
+**BA fast-track policy captured as cross-validation** (not new seed
+rules): BA source independently confirms oneworld Ruby → no fast track
+(BA Executive Club Bronze explicitly excluded). Matches §64's tier-deny
+behavior for `alliance_defined + oneworld_sapphire` rules — Ruby pax
+under any of the new rules → §64 deny. Two independent sources
+(Finnair table structure + BA policy text) now support the Sapphire+
+threshold, no longer a single-source claim.
+
+**QR source (Privilege Club tier table) has no fast-track-security line
+at all** — only Priority check-in, Priority boarding, Priority baggage.
+Silence per §63; no QR-specific seed rows added. QR pax fall through the
+oneworld baseline rules (QR Gold = Sapphire, QR Platinum = Emerald).
+
+### Access classes and rule shapes
+
+Finnair's page uses an airport × pax-tier matrix. Four distinct
+column-fill patterns emerged, each with a different rule set:
+
+  **FULL (46 airports)** — all 8 columns ✓ (Business Flex/Classic/Saver,
+  FP Platinum Lumo/Platinum/Gold/Silver, oneworld Emerald). Three rules
+  per airport:
+
+  ```
+  Rule 1  oneworld_sapphire + [AY] + alliance_defined + allow  (pri 110)
+          AY-scope status path. Cabin override for biz/first per §64.
+  Rule 2  oneworld_emerald  + (no carrier) + alliance_defined + allow  (pri 90)
+          oneworld reciprocity path — external oneworld Emerald pax on
+          any oneworld carrier's flight. Corresponds to the "oneworld
+          Emerald ✓" column on Finnair's table.
+  Rule 3  cabin biz/first  + [AY] + local + allow  (pri 100)
+          AY-scope cabin path — Business Flex/Classic/Saver on AY-op flight.
+  ```
+
+  **FULL_NO_FP_SILVER (1 airport: FLR)** — same 3 rules as FULL for
+  this batch. FP Silver = oneworld_ruby; Rule 1 min_tier=sapphire fails
+  → §64 tier deny → denied. Correct per Finnair source (FLR's Silver
+  column is blank). **Critical §65 note:** when a later PR extends the
+  §65-style Ruby [AY] alliance_defined allow to other AY-network
+  airports, **FLR must be excluded** from that list — Finnair source
+  denies FP Silver at FLR.
+
+  **FULL_NO_OW_EMERALD (3 airports: GDN, TLL, WAW)** — Rules 1 + 3 only,
+  no Rule 2. External oneworld Emerald pax on non-AY flights → carrier
+  miss on Rule 1, no Rule 2 → `not_enough_info` (silent). **Deliberately
+  NOT explicit deny:** Finnair source's blank Emerald column could mean
+  "reality: no reciprocity" OR "Finnair does not know / does not
+  publish." Silence per §63; without a second source (BA/QR) covering
+  these airports, `?` is honest. Contrast with BIZ_ONLY where source
+  structure IS an authoritative absence claim (see next).
+
+  **BIZ_ONLY (8 airports: BKK, DOH, DXB, DUB, KIX, PVG, HND, YYZ)** —
+  two rules per airport (Model α):
+
+  ```
+  Rule 3α  cabin biz/first  + [AY] + local + allow  (pri 100)
+           Cabin path — Business Flex/Classic/Saver on AY-op flight.
+  Rule 5α  oneworld_sapphire + [AY] + alliance_defined + deny  (pri 100)
+           + condition: NOT cabin biz/first
+           Explicit source-verified deny for status pax without a
+           premium cabin ticket. Finnair source lists ONLY Business-
+           ticket columns as ✓ at these airports; status columns are
+           deliberately blank in the source structure — an authoritative
+           absence, not silence.
+  ```
+
+  **Why α not β:** Model β (broader deny rule matching any non-cabin
+  AY-pax without status filter) would additionally deny statukseton
+  economy pax — matching Finnair source semantically ("only Business
+  ticket admits") but fragilising future paid-add-on-service seeding.
+  A future rule `provider='paid_priority_add_on' + [AY] + local + allow`
+  would be blocked by DENY-broad because deny rules evaluate first in
+  the engine regardless of allow-rule priority. Instead:
+
+  - Model α gets Sapphire+ economy → denied ✓ (source-verified explicit
+    absence of status admission).
+  - Statukseton economy AY at BIZ_ONLY airport → `not_enough_info` (?),
+    NOT `denied`.
+
+  **This is a deliberate ali-varovaisuus.** Documented so it doesn't
+  return as a surprise: the "?" preserves the possibility that a future
+  paid-add-on rule admits statukseton pax without our current model
+  blocking it. Full explicit-deny for statukseton needs either:
+    (a) A negated-provider condition in the deny rule that excludes
+        future paid providers (fragile — every new provider needs to be
+        listed), or
+    (b) Engine change: allow-rule priorities can override deny-rules for
+        same-airport service-type combos.
+  Neither is worth the complexity for this batch.
+
+### HEL / LHR / JFK — not touched
+
+Existing fast_track_security rules already cover Sapphire+ oneworld:
+
+  - **HEL id=1**: `oneworld_sapphire, no carrier_restriction, alliance_defined` — broader than what Finnair source dictates but includes it. Home-hub reciprocity policy statement, not derived from this Finnair page.
+  - **HEL id=12**: `oneworld_ruby, [AY], alliance_defined` — §65 Finnair Plus Silver national exception.
+  - **LHR id=4**: `oneworld_sapphire, [BA,IB,AA,CX,QF,JL,QR,AY], alliance_defined, T3+T5 only` — expanded per §63 audit.
+  - **JFK id=6**: `oneworld_sapphire, no carrier_restriction, alliance_defined`.
+
+Adding another rule at HEL/LHR/JFK from this Finnair source would either duplicate (if broader) or over-restrict (if narrower with [AY]) — neither useful.
+
+### LGW — deferred to own PR
+
+BA source confirms fast track at LGW as a guaranteed BA hub. LGW is
+**not** in the airports table. Adding it requires (a) airport row
+insertion (OurAirports masterdata pattern per §66 Case C) and (b) a
+BA-sourced fast-track rule (source_url = BA fast-track-security policy
+page). Kept separate to preserve this PR's scope as Finnair-only.
+
+### `source_url = internal-ref:...` (non-URL prefix)
+
+All 163 seeded rows use `source_url =
+"internal-ref:finnair-priority-turvatarkastus/2026-07-26"`. The
+`internal-ref:` prefix is a deliberate non-URI-scheme marker so a future
+enforcement script checking for `http://` / `https://` prefixes cannot
+confuse a manual copy with a fetchable URL. This preserves §67's rigor:
+`source_url IS NULL` still means "no source"; a URL-shaped value means
+"fetchable source"; `internal-ref:...` means "recorded but not
+fetchable" — three distinct states. **If an enforcement script is later
+written, it must treat `internal-ref:` as a legitimate source (same as
+`http://` / `https://`), not as a placeholder for a missing URL.**
+
+### Behavior matrix (verified against dev server)
+
+| Airport | Pax scenario | Result | Rule fired |
+|---|---|---|---|
+| ARN (FULL) | AY Gold eco AY-flight | allowed | Rule 1 |
+| ARN (FULL) | AY Gold eco BA-flight | **denied** | Rule 2 tier miss + §64 |
+| ARN (FULL) | AY statukseton biz AY-flight | allowed | Rule 3 |
+| ARN (FULL) | AY statukseton eco AY-flight | **denied** | Rule 1 no_status + §64 |
+| ARN (FULL) | BA Gold (Emerald) eco BA-flight | allowed | Rule 2 |
+| ARN (FULL) | BA Silver (Sapphire) eco BA-flight | **denied** | Rule 2 tier miss + §64 |
+| BKK (BIZ_ONLY) | AY Gold eco AY-flight | **denied** | Rule 5α |
+| BKK (BIZ_ONLY) | AY Gold biz AY-flight | allowed | Rule 3α (5α cond fail) |
+| BKK (BIZ_ONLY) | AY statukseton eco AY-flight | ? | (α deliberate) |
+| GDN (NO_OW_EMERALD) | BA Gold (Emerald) eco BA-flight | ? | no Rule 2 |
+| FLR (NO_FP_SILVER) | AY Silver eco AY-flight | **denied** | Rule 1 tier miss + §64 (source-align) |
+| FLR (NO_FP_SILVER) | BA Gold eco BA-flight | allowed | Rule 2 |
+
+### Known follow-up TODOs
+
+- **§65-style Ruby [AY] extension** to other AY-network airports: when
+  seeded, FLR must be excluded (per above).
+- **LGW airport row + BA-sourced fast track rule** (BA-source-only PR).
+- **§65 stale-URL fix**: `finnair.com/fi/fi/finnair-plus/tietoa-ohjelmasta/edut`
+  returns 404 as of 2026-07-26. HEL id=12's `source_url` points there.
+  Separate PR to update; not blocking.
+- **Star Alliance / SkyTeam fast track branches**: permanently out of
+  scope (no source, oneworld-centric app).
+- **Reason-string clarity at FULL airports on non-AY carriers**: when
+  a Sapphire+ AY-pax on non-AY carrier (e.g., codeshare BA-operated)
+  hits ARN, the returned deny reason cites Rule 2's Emerald requirement
+  rather than Rule 1's AY-carrier requirement. Correct model behavior
+  (Rule 2 is the alliance_defined rule that fires §64), but user-facing
+  reason string might be misleading. If UX feedback surfaces this,
+  consider adding a per-rule reason override or a separate carrier-scope
+  deny rule.
+- **HA in scraper CARRIER_MAP** (from §66 Case C follow-up): still open.
+- **Enforcement script recognition of `internal-ref:` prefix**: if any
+  script checks source_url validity, it must treat `internal-ref:` as
+  legitimate (not placeholder).
