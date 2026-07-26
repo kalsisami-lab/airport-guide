@@ -5,6 +5,7 @@
 const COUNTRY_NAMES: Record<string, string> = {
   AE: 'UAE',
   AL: 'Albania',
+  AR: 'Argentina',
   AT: 'Austria',
   AU: 'Australia',
   BE: 'Belgium',
@@ -36,6 +37,7 @@ const COUNTRY_NAMES: Record<string, string> = {
   LU: 'Luxembourg',
   LV: 'Latvia',
   MT: 'Malta',
+  MX: 'Mexico',
   NL: 'Netherlands',
   NO: 'Norway',
   PL: 'Poland',

@@ -1698,27 +1698,62 @@ don't have any. Documented sources:
   **Action:** none required. Verify individually if a specific
   user report indicates a lounge missed.
 
-### Case C — Centurion scope expansion (out of scope for now)
+### Case C — Centurion scope expansion (seeded 2026-07-24)
 
-16 Centurion Lounge network airports are **not in the airports table**
-because they're primarily US airports Finnair doesn't serve:
+**Status:** all 16 airports seeded as of 2026-07-24 via
+`db/patch-centurion-case-c-16-airports.ts`. Airport rows come from
+`sami/airports.csv` (OurAirports masterdata); lounge rows come from
+`scripts/data/centurion-lounges.json`.
 
-  ATL, CLT, DEN, IAH, LAS, LGA, PHL, PHX, SLC, SFO, DCA (US)
-  EZE, MEX, MTY, BOM, SYD (International)
+  - **US (11):** ATL, CLT, DCA, DEN, IAH, LAS, LGA, PHL, PHX, SFO, SLC
+  - **International (5):** EZE, MEX, MTY, BOM, SYD (MEX has 2 lounges,
+    T1 + T2 → 17 lounges total)
 
-Note MEX has 2 lounges (T1 + T2). Adding these would require:
-  1. Insert 16 rows into `airports` (with proper metadata).
-  2. **Seed each with more than just Centurion** — a lonely
-     Amex-lounge entry at DFW-scale hubs would look absurd. E.g. ATL
-     hosts Delta Sky Club (huge SkyTeam presence), DFW/PHX/CLT are
-     AA hubs with Admirals Club + Flagship, MEX/BOM have local
-     operator lounges.
+Per §67, every new airport row uses the default `lounge_coverage_status
+= 'unverified'` — the UI honestly says "Centurion is here; other lounge
+coverage is not verified." This is the key insight that made seeding
+tractable: §66's original "a lonely Amex-lounge entry would look absurd"
+concern assumed the pre-§67 UI where empty = "no lounges." Post-§67 the
+empty-adjacent state is `?` with an honest disclaimer, not a confident
+false negative.
 
-  **Action:** deferred pending scope decision. The app's current
-  positioning is a Finnair-passenger tool; expanding to a generic
-  Amex-cardholder tool would need product-level consideration.
-  When/if the decision is made, `scripts/data/centurion-lounges.json`
-  is ready to drive the Centurion seeding portion.
+The patch also added **MX** (Mexico) and **AR** (Argentina) to
+`lib/airport-search/countryNames.ts` — first appearance of these ISO2
+codes in the DB.
+
+### Case C — what this seeding deliberately does NOT do
+
+**No non-Centurion lounges were seeded.** ATL has a large Delta Sky Club
+presence, DFW/PHX/CLT are AA hubs with Admirals Club + Flagship, SYD is
+QF's flagship (multiple oneworld First/Business lounges), BOM has JAL /
+CX / QR oneworld lounges. None of that data lives in
+`scripts/output/oneworld-lounges.json` because none of these IATAs are
+in `scripts/iatas.txt`, and there is no scraper for Star Alliance or
+SkyTeam at all.
+
+Attempting to seed those from memory would be exactly the §66 bug the
+MAD incident exposed. Two structurally different follow-ups:
+
+  - **oneworld coverage for these 16 IATAs** — own future PR: add
+    IATAs to `scripts/iatas.txt`, rerun `scrape-oneworld-lounges.ts`,
+    seed the results. Sourced, so allowed under §66.
+  - **Star Alliance / SkyTeam coverage** — permanently out of scope.
+    No data source exists in this repo and the app is oneworld/Finnair-
+    centric. Not planned.
+
+### Case C — remaining rough edges
+
+  - Airport `name` and `city` fields are verbatim from OurAirports — no
+    editorial cleanup. Two look awkward in UI:
+      - **EZE**: city = "Buenos Aires (Ezeiza)"
+      - **SYD**: city = "Sydney (Mascot)"
+    Trusting the primary source over local cleanup per §66. If either
+    is a UX problem, fix at the render layer, not by mutating rows.
+  - No `terminals` rows created for these 16 airports. Centurion rules
+    are gate-agnostic (no terminal restriction on access), so this
+    doesn't affect correctness. If a future oneworld batch for the
+    same IATAs needs terminal filtering (§45), add terminals at that
+    point.
 
 ---
 
