@@ -2628,3 +2628,102 @@ kerrallaan.
 
 **Related:** [[§66]] (no memory-reconstruction — jokainen tier-rivi
 tarvitsee source). [[§70]] (audit josta tämä nousi).
+
+### §73 PR-A päivitys (2026-07-27) — schema-migration + 5 FFP:tä stampattu
+
+`db/migrations/0004_large_sumo.sql` lisäsi `source_url` + `verified_at`
+`status_tiers`-tauluun (molemmat nullable). `db/patch-73-status-tiers-source.ts`
+stamppasi 16 elite-tier-riviä (AY 4, BA 3, JL 3, QR 3, MH 3) lähteestä
+`https://www.oneworld.com/members/{carrier}`, `verified_at = 2026-07-27`.
+
+**Method:** kunkin FFP:n tier-taulukko fetchattiin oneworld.com:sta
+ennen patchia. DB-rivien mappaus verrattiin lähteeseen `alliance_tier`
+-arvon (ei nimen kirjoitusasun) perusteella. Kaikki 16 elite-mappausta
+täsmäsivät konfliktivapaana. Konfliktin sattuessa patch olisi loggerin
+ja skipannut rivin — ei stampausta ilman lähdevahvistusta.
+
+**Sivutuote — Lumo-verifiointi §66-hetki:** alkuperäinen suunnitelma
+oletti että AY Lumo-tier vaatii erikseen `finnair.com`-lähteen koska
+oneworld.com ei muka listaisi Lumoa. WebFetch osoitti että
+oneworld.com/members/finnair listaa eksplisiittisesti "Finnair Plus
+Platinum Lumo → oneworld Emerald". Lumo stampattiin oneworld.com:sta
+kuten muutkin AY-rivit. Fetch esti muistista-rekonstruoinnin.
+
+**Base-tierit ei-stampattu (§73 tietoinen tyhjä):** 5 riviä (AY Basic,
+BA Blue, JL JMB, QR Burgundy, MH Explorer) ovat `alliance_tier='none'`.
+oneworld.com:n tier-matching-taulukko ei mainitse niitä lainkaan — ne
+edustavat alliance-statuksen POISSAOLOA, eivät lähteen attestoimaa
+mappausta. `source_url = NULL` säilyy niille tietoisesti. Jos joku
+tulevaisuudessa haluaa lähteellistää ne carrier-omilta FFP-sivuilta
+(esim. finnair.com/finnair-plus Basic-tason kuvaus), se on erillinen
+pikku follow-up — ei edellytys.
+
+**Sivutuote — DB migration-state (0002/0003) taustatäyttö:** Patchia
+ajaessa `__drizzle_migrations`-taulusta puuttui rivit migraatioille
+0002 ja 0003 (kolumnit `tier_semantics` ja `lounge_coverage_status`
+oli ajettu DB:hen aiemmin patch-skripteillä out-of-band, ei
+drizzle-kit:llä). Sen takia `drizzle-kit migrate` jumittui yrittäessään
+ajaa 0002:n uudestaan. §73 PR-A:ssa lisättiin puuttuvat rivit
+taustatäyttönä `__drizzle_migrations`:iin (hash = sha256 tiedostosta,
+sama kuin 0000/0001 -riveillä) jotta 0004 saatiin sovellettua puhtaasti
+ja jotta jatkossa `npm run db:migrate` toimii ilman virhettä. Tämä ei
+ollut §73:n scope-asia mutta oli välttämätön 0004:n ajoon — kirjattu
+tähän jotta ero tiedostojen ja DB-taulun välillä ei ihmetytä myöhemmin.
+
+**§73 jäljellä (PR-B, oma haara):** 8 puuttuvaa oneworld-FFP:tä
+(CX/QF/AS/RJ/AT/UL/WY + FJ) + tier-mappingit AA:lle ja IB:lle. Sama
+metodi: WebFetch → verifiointi → stamppaus. Base-tier-käsittely sama
+sääntö (ei stamppausta 'none'-riveille).
+
+---
+
+## 74. HEL Finnair Platinum Wing / Corner — program-specific tier, ei oneworld-Emerald
+
+**Nousi:** §73 PR-A:n aikana 2026-07-27 Lumo-tier-verifioinnin yhteydessä.
+
+**Riski:** HEL:in Finnair-lounge-mallissa saattaa olla rivi joka
+mallintaa Platinum Wingin (non-Schengen) ja Platinum Cornerin
+(Schengen) pääsyn `alliance_status` + `oneworld_emerald`-tasolla. Se
+olisi liian salliva — Finnairin lähteen mukaan Wing/Corner ovat
+Finnair Platinum + Lumo -tason lounget, EIVÄT geneerisen
+oneworld-Emeraldin tavoitettavissa. BA Gold (oneworld Emerald) joka
+lentää Finnairin lennolla EI pääse Wingiin/Corneriin, vain Finnairin
+Business Loungeen.
+
+**Model:** Oikea sääntö on `airline_own`-tyyppinen kanava jolla on
+Finnair-tier-ehto (`carrier_specific [AY]` + `min_alliance_tier` +
+program-tier-condition), ei `all_alliance` `oneworld_emerald`-tasolla.
+§56-tyyppinen ("program-specific tier not modelable") osittain, mutta
+tässä on §64-tyyppinen tier-hierarchy-deny -komponentti: oneworld-Emerald
+ilman AY-korttia = denied Wingiin/Corneriin. Cabin=first override
+mahdollisesti soveltuu (F-lipun Finnair-yhteydessä myöntää usein pääsyn).
+
+**Action needed:**
+1. Tarkista DB:stä: `SELECT l.name, c.alliance_access, r.min_alliance_tier,
+   r.carrier_restriction FROM lounges l JOIN airports a ON a.id=l.airport_id
+   JOIN lounge_access_channels c ON c.lounge_id=l.id JOIN lounge_access_rules r
+   ON r.channel_id=c.id WHERE a.iata_code='HEL' AND l.name LIKE 'Finnair%';`
+2. Jos rivit ovat `all_alliance` + `oneworld_emerald` ilman
+   `carrier_restriction`:ia, se on §74:n kohde — korjaa patchilla
+   `carrier_specific + [AY]` (§36-linjassa) ja lisää tarvittaessa
+   airline_own-kanava Finnair Platinum/Lumo -tierille.
+3. Regressiotesti: BA Gold + AY-lennolla + Platinum Wing → denied,
+   Finnair Platinum + AY-lennolla + Platinum Wing → allowed.
+
+**Lähde:** finnair.com/finnair-plus Lumo/Platinum-tason edut listaavat
+Wing/Corner erikseen "Finnair Platinum + Lumo -tason lounget"
+-otsikolla. oneworld-Emerald listalla mainitaan vain Business Lounge.
+
+**Prioriteetti:** Keskitason. Väärä salliva-suuntaan-virhe (ei estä
+oikeutettua pääsyä), ei näy §66-tyyppisenä silence≠denied -virheenä.
+Vaikuttaa jos non-Finnair oneworld-Emerald-käyttäjä (esim. BA Gold, JL
+Diamond) saa väärän "allowed"-vastauksen Wingiin. Näiden käyttäjä-
+segmenttien esiintyvyys HEL:issä on pieni mutta ei nolla.
+
+**Ei tässä PR:ssä (§73 PR-A):** vain kirjattu §73-Lumo-verifioinnin
+sivutuotteena. Oma haara + patch tarvitaan.
+
+**Related:** [[§56]] (program-specific tier not modelable). [[§64]]
+(alliance_defined tier-deny). [[§36]] (AY-inclusion Finnair-network
+airports). [[§17]] (aiempi Finnair Lounge over-restriction -korjaus,
+oppitunti että Finnair-lounge-mallissa on erityispiirteitä).
