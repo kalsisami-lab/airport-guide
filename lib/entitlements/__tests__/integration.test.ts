@@ -406,3 +406,57 @@ describe('API contract: HEL + AY Gold → kaikki neljä palvelua', () => {
     }
   });
 });
+
+// ─── §51 audit corrections (BKK Oman Air, LAX Business Lounge) ──────────────
+// Regression tests for db/patch-51-audit-corrections.ts. MH tier-mapping
+// (Enrich Gold → oneworld_sapphire) was added in the same patch so LAX's
+// R1→R2 shift can be verified with a carrier that was not on the pre-fix
+// 9-carrier list. See docs §70.
+
+describe('BKK Oman Air First & Business Class Lounge — §51 R2 → R1', () => {
+  test('MH Enrich Gold (sapphire, not on [AY,WY] list) → not allowed via alliance_status', () => {
+    const r = findEntitlementsAtAirport(
+      { statusCards: [{ programCode: 'mh-enrich', tierName: 'Gold' }] },
+      { operatingCarrier: 'MH', cabin: 'economy', departureAirport: 'BKK', arrivalAirport: 'KUL' },
+      repos, { now: OPEN },
+    );
+    assert.equal(r.status?.allianceTier, 'oneworld_sapphire', 'MH Gold normalises to oneworld_sapphire');
+    const lounge = find(r.lounges, 'Oman Air First & Business Class Lounge');
+    assert.notEqual(lounge.access.status, 'allowed',
+      'Post-§51: MH not on carrier_restriction ["AY","WY"] — must not be allowed via alliance_status');
+  });
+
+  test('AY Gold (on [AY,WY] list per §36) → allowed', () => {
+    const r = findEntitlementsAtAirport(
+      { statusCards: [{ programCode: 'ay-plus', tierName: 'Gold' }] },
+      { operatingCarrier: 'AY', cabin: 'economy', departureAirport: 'BKK', arrivalAirport: 'HEL' },
+      repos, { now: OPEN },
+    );
+    const lounge = find(r.lounges, 'Oman Air First & Business Class Lounge');
+    assert.equal(lounge.access.status, 'allowed', 'AY on carrier list → allowed');
+  });
+});
+
+describe('LAX The Los Angeles Business Lounge — §51 R1 → R2', () => {
+  test('MH Enrich Gold (sapphire, NOT on pre-fix 9-carrier list) → allowed post-fix', () => {
+    const r = findEntitlementsAtAirport(
+      { statusCards: [{ programCode: 'mh-enrich', tierName: 'Gold' }] },
+      { operatingCarrier: 'MH', cabin: 'economy', departureAirport: 'LAX', arrivalAirport: 'KUL' },
+      repos, { now: OPEN },
+    );
+    assert.equal(r.status?.allianceTier, 'oneworld_sapphire', 'MH Gold normalises to oneworld_sapphire');
+    const lounge = find(r.lounges, 'The Los Angeles Business Lounge');
+    assert.equal(lounge.access.status, 'allowed',
+      'Post-§51: all_alliance sapphire — any oneworld carrier grants access');
+  });
+
+  test('AY Gold (was on pre-fix list; still allowed post-fix) → allowed regression', () => {
+    const r = findEntitlementsAtAirport(
+      { statusCards: [{ programCode: 'ay-plus', tierName: 'Gold' }] },
+      { operatingCarrier: 'AY', cabin: 'economy', departureAirport: 'LAX', arrivalAirport: 'HEL' },
+      repos, { now: OPEN },
+    );
+    const lounge = find(r.lounges, 'The Los Angeles Business Lounge');
+    assert.equal(lounge.access.status, 'allowed', 'AY still allowed post-fix (regression)');
+  });
+});

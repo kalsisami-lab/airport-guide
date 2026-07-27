@@ -2374,3 +2374,257 @@ business pax at RVN → `denied` (matches source-verified absence). The
     Finnish regional Ryhmä 4 case for KTT/OUL/TKU/VAA.
   - **§66 Case B (b)** — the 15 Finnish regionals mentioned in Case B
     as "unverified, own future PR" are now this PR.
+
+---
+
+## 70. §51 audit — proxy-driven pass through wording verification (2026-07-27)
+
+**Status:** §51 audit tehty proxy-nostojen ja wording-kattavuuden osalta;
+loput verifioimatta matalan riskin tilassa. **Ei "audit valmis"** —
+katetaan tässä täsmälleen ne rivit joita joko wording-JSON tai proxy-
+signaali osoitti tarkasteltavaksi.
+
+### Metodi (kaksivaiheinen)
+
+1. **Ehdokaslista proxy-signaaleilla** (§51:n itsensä epäluotettavaksi
+   toteama menetelmä luokitteluun, mutta hyödyllinen kohdennukseen):
+   `scripts/audit-51.ts` nostaa (a) brand-nimiset R2-loungeet joilla
+   scrape-carrier-lista on lyhyt, (b) R1-loungeet joilla scrape-lista
+   on pitkä, (c) generic-nimiset R2-loungeet. Nämä ovat korkeimman
+   riskin ehdokkaat, EI luokituksia.
+
+2. **Wording-verifikaatio** (§51:n autoritatiivinen menetelmä):
+   `scripts/audit-51-wording.ts` vertaa `accessPolicyText`-kenttää
+   (oneworld.com policy-teksti, scrape-outputissa PR #32:n jälkeen)
+   DB:n `alliance_access`-luokitukseen. Wording voittaa proxyn.
+
+### Kattavuus
+
+  - **37/79 IATA:a wording-verifioitu:** 16 pre-tallennettua Case C
+    -PR #32:sta (ATL, BOM, CLT, DCA, DEN, EZE, IAH, LAS, LGA, MEX, MTY,
+    PHL, PHX, SFO, SLC, SYD) + 21 uudelleen scrapettua tässä auditissa
+    (BKK, CDG, DFW, DOH, FCO, GVA, HKG, HND, LAX, LIN, MEL, MIA, NGO,
+    NRT, PVG, SEA, SIN, YYZ, BCN, AMS, ICN).
+
+  - **~42 IATA:a verifioimatta:** ei proxy-nostoa, ei wording JSON:issa
+    (FRA, MUC, MAD, ORD, KEF, VIE, ZRH, DUB, KIX, DEL, TLV ym.).
+    **Matala riski:** proxy ei nostanut, joten nimi ja carrier-count
+    eivät antaneet indikaatiota luokituksen virheestä. EI merkitä
+    auditoiduksi — re-scrape myöhemmin jos tarve (esim. käyttäjän
+    kenttäraportti indikoi väärää luokitusta).
+
+### Tulos (60 proxy-ehdokasta)
+
+  | Verdict | Kpl | Merkitys |
+  |---|---|---|
+  | AGREE (proxy false alarm) | 56 | DB:n R1/R2 = wording |
+  | **DISAGREE (aito §51-korjaus)** | **2** | Katso alla |
+  | Ei-§51-löydös | 2 | Katso §71 + §72 |
+
+### Kaksi §51-korjausta
+
+**1. BKK — Oman Air First & Business Class Lounge (lounge_id=205)**
+  - Wording: `"these oneworld member airlines only"` → R1
+  - DB oli: `all_alliance`, ei carrier-listaa → kaikki oneworld
+    sapphire/emerald sisään
+  - Fix: `carrier_specific` + `["AY","WY"]` (§36 AY-lisäys mukana)
+  - Regressio: MH/CX/QF/BA/AA/IB/JL/QR sapphire → ennen allowed,
+    nyt denied. Kenttäraportti-vahvistus tehtävissä ainoastaan post-fix.
+
+**2. LAX — The Los Angeles Business Lounge (lounge_id=214)**
+  - Wording: `"any oneworld member airline"` → R2
+  - DB oli: `carrier_specific` + 9 carrieria [AA,BA,CX,FJ,AY,IB,JL,QF,QR]
+  - Fix: `all_alliance` + `NULL`
+  - Regressio: MH/RJ/AT/UL/AS sapphire → ennen paid_available/denied,
+    nyt allowed. Muut kanavat (PP/LK/DP/paid) ennallaan.
+
+### Sivutuote: tier-mapping-aukko (johtaa §73:een)
+
+Auditin sivutuotteena löytyi että DB:ssä on **vain 4/13 oneworld-FFP:llä**
+tier-mapping: AY, BA, JL, QR. Kaikki neljä olivat myös LAX-fix:n
+pre-fix 9-carrier-listalla — joten ilman uutta tier-mappia LAX-korjauksen
+denied→allowed -siirtymää ei olisi voinut testata aidosti. Lisättiin
+**MH Enrich** (tarkistettu oneworld.com/members/malaysia-airlines
+-lähteestä 2026-07-27) yhdellä uudella FFP:llä + 4 tier-rivillä.
+
+Loput 8 puuttuvaa FFP:tä (CX, QF, AS, RJ, AT, UL, WY + AA/IB
+tier-täydennys) kirjattu erillisenä eränä §73:een — jokainen vaatii
+per-FFP-lähdevahvistuksen (rekonstruktio-riski §66:n mukaan).
+
+### Menetelmä-oppi (proxy-signaali on hyödyllinen apuväline)
+
+`audit-51.ts`:n proxy-signaali (nimi + carrier count) EI ole §51:n mukaan
+luotettava luokittelun perusteena — mutta se OSOITTAUTUI hyödylliseksi
+kohdennuksen apuvälineeksi: 60 nostosta 2 olivat aitoja löydöksiä
+(3.3 % osumaprosentti), ja loput 56 vahvistivat että brand-nimi + lyhyt
+carrier-lista ei sinänsä indikoi väärää luokitusta oneworld:in policy:ssä.
+Proxy on käyttökelpoinen kunhan lopullinen luokitus tulee wordingista.
+
+### Skriptit
+
+  - `scripts/audit-51.ts` — proxy-ehdokkaiden nosto (esiintynyt jo)
+  - `scripts/audit-51-wording.ts` — accessPolicyText vs. DB diff (uusi)
+  - `db/patch-51-audit-corrections.ts` — 2 lounge-korjausta + MH
+    tier-mapping (uusi)
+
+### Deferred (own follow-up)
+
+  - **Loput ~42 IATA:a matalan riskin verifioimattomia.** Jos §36-tyyppinen
+    kenttäraportti tulee jostakin, aja `scripts/scrape-oneworld-lounges.ts
+    <IATA>` ja sitten `scripts/audit-51-wording.ts` uudelleen.
+
+### Ties to existing sections
+
+  - **§51** — auditin varsinainen rule; tämä on sen ensimmäinen laaja ajo.
+  - **§36** — BKK Oman Air:n AY-lisäys (Finnair-verkko-sääntö) mukana.
+  - **§71** — DOH lounget joilla accessPolicyText puuttuu (Silver Lounge,
+    Al Mourjan South, Al Safwa First) — mahdollisesti QR-oma tier eikä
+    oneworld-alliance-lounge. §56-sukua.
+  - **§72** — LAX Admirals Club: kolme fyysistä loungea samalla nimellä,
+    kaksi puuttuu DB:stä. §45-sukua (terminal-specific coverage).
+  - **§73** — loput 8 puuttuvaa oneworld-FFP-tier-mappia per-FFP-source
+    -vahvistuksen jälkeen.
+
+---
+
+## 71. DOH lounges without accessPolicyText — QR-native tier vs oneworld
+
+**Discovered during:** §70 §51-audit ajossa 2026-07-27.
+
+**Risk:** Kolme DOH-loungea, joilla oneworld.com scrape ei näytä
+`accessPolicyText`-kenttää lainkaan (JSON:issa `null`):
+  - Al Mourjan Business Lounge - South
+  - Al Safwa First Lounge
+  - Qatar Airways Silver Lounge - South
+
+DB:ssä nämä on modeloitu `alliance_status` -kanavina — Silver Lounge
+jopa `min_alliance_tier = oneworld_ruby` (id=204), mikä on hyvin
+epätavallinen: ruby ei yleensä saa alliance-status-loungea. `source_url`
+on `qatarairways.com/en/premium/lounges.html`, EI oneworld.com — indikoi
+että lounge on ehkä QR:n oma tier-lounge (Privilege Club Silver etc.),
+ei oneworld-alliance-verkossa. Al Safwa First on jo §52-auditissa
+migroittu `airline_own [QR] + cabin='first'` -malliin (patch-doh-52-audit),
+mutta Silver Lounge ja Al Mourjan South ovat samassa epäselvässä
+tilassa vielä.
+
+**Toimenpide (ei tämän PR:n scope):**
+  - Verifioi oneworld.com per lounge — onko lounge listattu oneworld
+    Airport Lounge Finder:issa DOH:issa? Jos näkyy scrape:ssä mutta
+    ilman accessPolicyText:iä, se voi tarkoittaa scraper-parannuksen
+    tarvetta (esim. inline-exception-teksti jonka `.conditions`-selektori
+    ohittaa).
+  - Jos ei-alliance: migrate `alliance_status` → `airline_own` +
+    `carrier_restriction=["QR"]` + program-specific-tier condition
+    (Al Safwa-tyyliin). §56-sukua.
+  - Diagnostiikkatyökalu: `scripts/inspect-oneworld-dom.ts` kertoo
+    mikä DOM-rakenne näillä lounge-korteilla on DOH:issa.
+
+**Related:** [[§52]] (DOH audit teki Al Safwa First -korjauksen jo §52:n
+mukaan). [[§56]] (program-specific tier not modelable).
+
+---
+
+## 72. LAX Admirals Club — 3 physical lounges, 1 DB row (coverage gap)
+
+**Discovered during:** §70 §51-audit ajossa 2026-07-27.
+
+**Risk:** LAX:issa on kolme fyysistä "American Airlines Admirals Club"
+-loungea eri terminaaleissa, joilla oneworld.com:issa on eri policyt:
+
+  | Terminal | oneworld wording | Access model |
+  |---|---|---|
+  | American Eagle Regional Terminal (gates 52D/52E) | "any oneworld" | R2 |
+  | Terminal 4 (near gate 41) | "any oneworld" | R2 |
+  | Tom Bradley International Terminal (151/153) | "these only" | R1 |
+
+DB:ssä on vain YKSI rivi (lounge_id=88), `location_description =
+"American Eagle Regional Terminal, opposite Gates 52D and 52E"`.
+Se on **oikein** oman terminaalinsa osalta (R2). Puuttuvat Terminal 4
+(R2) ja TBIT (R1) instanssit.
+
+Aiheutuva vaikutus: T4-lähtevä pax ei näe Admirals Clubia lainkaan (DB
+raportoi vain Regional Terminal -sijainnin). TBIT-lähtevä pax ei näe
+Admirals Clubia, jonka policy on carrier_specific.
+
+`scripts/audit-51-wording.ts` merkitsi tämän MIXED-verdictillä (JSON:issa
+molemmat wordingit saman (iata, name) -avaimen alla) — verdict oli
+skriptin harha, ei aito §51-ristiriita.
+
+**Toimenpide (ei tämän PR:n scope):**
+  - Seed 2 uutta lounge-riviä: LAX Admirals Club (T4) R2 + LAX Admirals
+    Club (TBIT) R1 [carrier-list scrape:sta]
+  - Vaatii `terminal_id` -kentän jokaiselle — LAX-terminaalirivit
+    olemassa? Tarkistettava ennen seedausta.
+  - Terminal-specific engine-suodatus (§45) on jo tunnistettu gap. Tämä
+    on §45:n konkreettinen käyttötapaus.
+
+**Related:** [[§45]] (terminal-specific lounge filtering — engine gap).
+
+---
+
+## 73. Tier-mapping-täydennys — puuttuvat oneworld-FFP:t
+
+**Discovered during:** §70 §51-audit ajossa 2026-07-27. Sivutuote:
+LAX-fix:n regression-testin kirjoittaminen paljasti että vain 4/13
+oneworld-FFP:llä on tier-mapping DB:ssä. Kirjattu erilliseksi eräksi
+koska jokainen FFP vaatii per-source-vahvistuksen (rekonstruktio-riski
+§66:n mukaan — muistista lisääminen olisi juuri se ansa).
+
+**Nykytila DB:ssä (2026-07-27):**
+
+  Täys-mapatut oneworld-FFP:t:
+    - AY  ay-plus       Basic/Silver/Gold/Platinum/Lumo → none/ruby/sapphire/emerald/emerald
+    - BA  ba-exec-club  Blue/Bronze/Silver/Gold          → none/ruby/sapphire/emerald
+    - JL  jl-mileage    JMB/JMB Crystal/JMB Sapphire/JMB Diamond → none/ruby/sapphire/emerald
+    - QR  qr-privilege  Burgundy/Silver/Gold/Platinum    → none/ruby/sapphire/emerald
+    - MH  mh-enrich     Explorer/Silver/Gold/Platinum    → none/ruby/sapphire/emerald  (LISÄTTY tässä PR:issä)
+
+  FFP olemassa mutta ei tier-mappia:
+    - AA  aa-advantage
+    - IB  ib-plus
+
+  Ei FFP:tä lainkaan:
+    - AS  Alaska Mileage Plan
+    - AT  Safar Flyer (Royal Air Maroc)
+    - CX  Cathay
+    - FJ  Tabua Club (Fiji Airways)
+    - QF  Qantas Frequent Flyer
+    - RJ  Royal Plus
+    - UL  FlySmiLes (SriLankan)
+    - WY  Sindbad (Oman Air)
+
+**Toimenpide per FFP (ei tämän PR:n scope):**
+Jokaiselle carrierille tarvitaan primary-source-URL (oneworld.com/members/
+{carrier} tai carrier's own tier-benefits-sivu) ja verified_at ennen
+inserttiä. AA ja IB ovat helpoimpia koska FFP-rivi on jo — tier-mappaus
+riittää. Loput vaativat sekä FFP-rivin että tierit.
+
+**Prioriteetti:** MH oli välttämätön §70:n testeille. Loput ovat
+"nice to have" — käyttäjät joilla on ei-mapattu FFP saavat tällä
+hetkellä `allianceTier: 'none'` normalisointituloksessa, mikä johtaa
+puuttuviin lounge-oikeuksiin. Kenttäraportti (esim. "Cathay Diamond
+sanoo että LHR Cathay First -lounge on evätty") on riski-signaali
+jonka pohjalta erillinen PR kannattaa priorisoida CX:n osalta.
+
+### Schema-aukko: status_tiers on kokonaan lähteetön
+
+`status_tiers`-taulussa EI ole `source_url`- eikä `verified_at`-kenttiä
+(id, program_id, tier_name, alliance_tier, fast_track). Kaikki nykyiset
+tier-rivit (AY/BA/JL/QR/MH) ovat lähteettömiä DB-tasolla — lähteet
+elävät patch-tiedostojen kommenteissa (kuten `SOURCE_MH_TIERS` -vakio
+`patch-51-audit-corrections.ts`:ssä).
+
+MH lisättiin §70:ssä ilman rivikohtaista source_url:ää koska muut
+tier-rivit eivät myöskään kanna sitä — pakottaminen vain yhdelle
+riville tuottaisi epäjohdonmukaisen välitilan (1 lähteellinen + 4
+lähteetöntä samaan tauluun).
+
+**Korjaus (kuuluu §73:n scopeen, ei erillinen PR):** Yksi schema-
+migration joka lisää `source_url` + `verified_at` `status_tiers`-tauluun
+ja lähteellistää KAIKKI tier-rivit kerralla per-FFP-source-vahvistuksen
+kanssa (AY, BA, JL, QR, MH + tulevat CX/QF/AS/RJ/AT/UL/WY + AA/IB
+tier-map). Yhtenäinen sääntö kaikille tier-riveille — ei rivi
+kerrallaan.
+
+**Related:** [[§66]] (no memory-reconstruction — jokainen tier-rivi
+tarvitsee source). [[§70]] (audit josta tämä nousi).
