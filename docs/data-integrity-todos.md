@@ -2675,6 +2675,61 @@ tähän jotta ero tiedostojen ja DB-taulun välillä ei ihmetytä myöhemmin.
 metodi: WebFetch → verifiointi → stamppaus. Base-tier-käsittely sama
 sääntö (ei stamppausta 'none'-riveille).
 
+### §73 PR-B päivitys (2026-07-28) — 8 FFP:tä stampattu, 2 lykätty §75:een
+
+`db/patch-73-pr-b-status-tiers.ts` insertoi 6 uutta FFP:tä
+(AS `as-atmos`, AT `at-safar-flyer`, CX `cx-asia-miles`, QF
+`qf-frequent-flyer`, RJ `rj-royal-club`, UL `ul-flysmiles`) ja
+täydensi 30 elite-tier-riviä olemassa oleville AA:lle ja IB:lle
+sekä uusille 6:lle. Kaikki rivit stampattu source_url =
+`oneworld.com/members/{carrier}`, verified_at = 2026-07-28.
+
+**Metodi:** WebFetch per FFP oneworld.com:sta ennen patchia.
+AA/QF/AS suunniteltiin alunperin kaksivahvistuslistalle
+(oneworld.com + carrierin oma tier-sivu) mutta kaikki kolme
+toista lähdettä olivat saavuttamattomia (aa.com 403, qantas.com
+timeout, alaskaair.com 404). oneworld.com hyväksyttiin yksinään
+kolmelle koska (a) data oli sisäisesti yhtenäistä ja täydellistä,
+(b) ne odotetut edge-caset joiden takia carrier-oma haluttiin
+olivat läsnä oneworld.com:ssa: AA Platinum Pro listalla, QF
+Platinum One listalla, AS:n rebrand Atmos Rewardsiin poistanut
+MVP Gold 75K -erottelun (edge-case ei enää olemassa lähteessä).
+
+**Kolme §66-hetkeä verifikaatiossa:**
+1. **FJ Tabua Club — ei olekaan olemassa.** `oneworld.com/members/fiji-airways`
+   sanoo eksplisiittisesti "Fiji Airways is now part of the
+   award-winning American Airlines AAdvantage® loyalty programme".
+   Sekä alkuperäinen oletukseni ("FJ = oneworld connect -kumppani")
+   että päivitetty oletus ("FJ = täysjäsen omalla Tabua-ohjelmalla,
+   maaliskuu 2024") olivat väärässä. Lähde korjasi molemmat.
+   Poistettu scope:ista — ei `fj-*` FFP-riviä.
+2. **AS Mileage Plan → Atmos Rewards** -rebrand. `oneworld.com/members/alaska-airlines`
+   listaa vain Atmos-tierit (Silver/Gold/Platinum/Titanium),
+   ei enää MVP-nimikkeistöä eikä MVP Gold 75K -erottelua.
+   Alkuperäinen huoli 75K:sta perustui vanhentuneeseen tietoon.
+3. **RJ Royal Club** (ei "Royal Plus"). §73-dokumentaatiossa
+   ohjelman nimi oli väärin. Lähteen nimi käytössä.
+
+**Base-tierit ei-riviä uusille FFP:ille:** kuudelle uudelle FFP:lle
+ei luotu base-tier-riviä (`alliance_tier='none'` -riviä) koska
+oneworld.com ei attestoi base-tier-nimeä 5/6 tapauksessa. Nimen
+keksiminen olisi §66-rike. Käytännön vaikutus: tuntemattoman
+kortin (esim. "MVP" AS:lle, "Bronze" QF:lle) esittäminen johtaa
+`getTierForCard → null` → StatusContext=null → ei alliance-oikeuksia
+= oikea käyttäytyminen. Legacy-base-rivit AA/IB:llä (jos
+seed:istä) jäävät koskemattomiksi, `source_url=NULL` (PR-A:n
+Basic/Blue/JMB/Burgundy/Explorer -linjassa).
+
+**Testit** (`lib/normalization/__tests__/statusTiersSourcePrB.test.ts`,
+88 assertiota / 8 FFP × alliance_tier-mappaus + source_url +
+normalisointi + §75-out-of-scope). Regressio: PR-A:n 5 FFP
+ennallaan (statusTiersSource.test.ts koskematon). Idempotentti:
+uudelleenajo raportoi 0/0/0 lisättyä.
+
+**§73 jäljellä (PR-C — pieni):** WY Sindbad + kaksi
+program-specific poikkeustieriä (AA ConciergeKey, QF Chairman's
+Lounge). Kirjattu erillisenä §75:enä.
+
 **PR-B scope EI KATA ei-oneworld-FFP:itä.** Fresh-clone smoke-testi
 paljasti 9 non-oneworld-FFP:n base-riviä (AF Explorer, DL Member, LH
 Member, TK Classic Plus, UA Member + EK Blue/Silver/Gold/Platinum) ja
@@ -2768,3 +2823,84 @@ sivutuotteena. Oma haara + patch tarvitaan.
 (alliance_defined tier-deny). [[§36]] (AY-inclusion Finnair-network
 airports). [[§17]] (aiempi Finnair Lounge over-restriction -korjaus,
 oppitunti että Finnair-lounge-mallissa on erityispiirteitä).
+
+---
+
+## 75. Tier-mapping-jäännökset — WY Sindbad + kaksi kutsu-only-tieriä
+
+**Nousi:** §73 PR-B:n aikana 2026-07-28. Kolme kohdetta joita ei
+voi yhden lähteen datalla stampata ilman §66-riskiä.
+
+### 75a. WY Sindbad — yhden lähteen vajaan tuntuinen lista
+
+`oneworld.com/members/oman-air` listaa vain kaksi tieriä:
+`Sindbad Silver → oneworld_ruby` ja `Sindbad Gold → oneworld_sapphire`.
+Ei Platinum-tieriä, ei Emerald-mappausta. `omanair.com/en/sindbad`
+palautti 404, joten kaksivahvistus ei ollut mahdollinen.
+
+**Epävarmuus:** Onko Sindbadilla oikeasti vain 2 oneworld-mappia
+(silloin lähde on täydellinen), vai jättääkö oneworld.com jotain
+listalta pois (silloin Platinum-tason WY-matkustaja jäisi
+näkymättömäksi jos stamppaisimme vajaan listan)? Yhden lähteen
+tapauksessa ei voi erottaa.
+
+**Toimenpide:** Odota kunnes toinen lähde saadaan
+(`omanair.com/plan-and-book/sindbad-loyalty-programme` tai
+Sindbad-status-benefits -sivu suoraan). Sitten sama metodi kuin
+PR-B: mappaukset lähdettä vasten → jos yhtenevät → stamppaa
+molemmista, jos konflikti → näytä konflikti eikä kirjoita.
+
+### 75b. AA ConciergeKey — kutsu-only, oletettavasti Emerald
+
+`oneworld.com/members/american-airlines` listaa neljä
+julkista tieriä (Gold/Platinum/Platinum Pro/Executive Platinum).
+ConciergeKey on kutsu-only eikä esiinny lähteessä. AA:n oma
+sivu (`aa.com/i18n/aadvantage-program/aadvantage-elite/...`)
+blockaa WebFetchin 403:lla, joten sitä ei voitu käyttää.
+
+**Riski:** ConciergeKey-matkustaja saa nykytilassa
+`getTierForCard('aa-advantage', 'ConciergeKey') → null` →
+StatusContext=null → ei alliance-oikeuksia. AA:n oma
+dokumentaatio julkisesti mainostaa että ConciergeKey ≥ Executive
+Platinum, siis oletettavasti oneworld Emerald. Mutta arvaus
+lähteettömästä tierista on §66-rike.
+
+**Toimenpide:** Odota lähdettä. Vaihtoehtoja: AA:n
+press-release siitä että ConciergeKey saa oneworld Emerald -edut
+(historiallisesti tapaus), tai AA:n oma yleistason kuvaus.
+Sitten yhdellä patchilla stamppaus.
+
+### 75c. QF Chairman's Lounge — kutsu-only, oletettavasti Emerald
+
+Sama kuvio kuin AA ConciergeKey. `oneworld.com/members/qantas`
+listaa Silver/Gold/Platinum/Platinum One (kaikki mapattu).
+Chairman's Lounge on kutsu-only eikä esiinny lähteessä.
+`qantas.com/us/en/frequent-flyer/discover-and-join/frequent-flyer-tiers.html`
+timeouttasi kahdesti.
+
+**Riski:** Chairman's Lounge -matkustaja jää näkymättömäksi.
+Käytännön esiintyvyys on olemattoman pieni (kutsu-only,
+julkisuudessa arvioitu ~200 jäsentä globaalisti), mutta
+symbolinen aukko on olemassa.
+
+**Toimenpide:** Sama kuin 75b — odota lähdettä, sitten stamppaa.
+
+### Yhteinen malli — §56-sukua
+
+Kaikki kolme ovat §56:n ("program-specific tier not modelable")
+sukua siinä että alliance-tier-mappauksen todentaminen vaatii
+lähteen jota emme yhden URL:n takana saa. Erotus §56:sta:
+§56:ssa mappausta EI ole (esim. QR Business Lite ei ole oneworld-tier),
+§75:ssä mappaus todennäköisesti ON mutta ei ole vielä lähteellä
+attestoitu.
+
+**Prioriteetti:** Matala. Kaikki kolme kohtaavat kutsu-only tai
+harvoin lentävää käyttäjäsegmenttiä (WY ehkä ei kutsu-only mutta
+Oman Air on pieni carrier). Ei muodosta silence≠denied -virhettä
+näissä käyttäjissä koska StatusContext=null johtaa
+not_enough_info -tulokseen, ei väärä-denied -tulokseen (§63:n
+linjassa).
+
+**Related:** [[§56]] (program-specific tier not modelable —
+lähisukua). [[§66]] (no memory-reconstruction — miksi näitä
+ei stampata yhdellä lähteellä). [[§73]] (isompi konteksti).
