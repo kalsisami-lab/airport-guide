@@ -2675,6 +2675,47 @@ tähän jotta ero tiedostojen ja DB-taulun välillä ei ihmetytä myöhemmin.
 metodi: WebFetch → verifiointi → stamppaus. Base-tier-käsittely sama
 sääntö (ei stamppausta 'none'-riveille).
 
+**PR-B scope EI KATA ei-oneworld-FFP:itä.** Fresh-clone smoke-testi
+paljasti 9 non-oneworld-FFP:n base-riviä (AF Explorer, DL Member, LH
+Member, TK Classic Plus, UA Member + EK Blue/Silver/Gold/Platinum) ja
+17 non-oneworld-FFP:n elite-riviä (AF/DL SkyTeam-tiereissä, LH/TK/UA
+Star-tiereissä). Nämä eivät ole PR-B:n scope:ssa — PR-B kattaa
+tismalleen 8 oneworld-FFP:tä yllämainittua. AF/DL/LH/TK/UA/EK ovat
+SkyTeam/Star Alliance/Emirates, eri kysymys kokonaan.
+
+### Ei-oneworld-FFP-artefakti (PR-A smoke-verifioitu 2026-07-27)
+
+Alkuperäinen `db/seed.ts` kylvi status_tier-rivit kaikille FFP:ille joita
+`airlines`-taulussa on, ei vain oneworld-FFP:ille. `alliance_tier`-enum
+sisältää edelleen `star_*` ja `skyteam_*` -arvot (`db/schema.ts:47-58`).
+Rivit ovat kaikki carrier-kohtaisesti oikein:
+
+- **SkyTeam:** AF Silver/Gold/Platinum/Ultimate → `skyteam_elite`/`skyteam_elite_plus`;
+  DL Silver/Gold/Platinum/Diamond → sama.
+- **Star Alliance:** LH Frequent/Senator/HON → `star_silver`/`star_gold`;
+  TK Elite/Elite Plus → sama; UA Silver/Gold/Platinum/1K → sama.
+- **Emirates (non-alliance):** kaikki tierit → `none` (oikein — EK ei ole
+  liittossa).
+
+**Kriittinen tarkistus:** Ei yhtään ei-oneworld-FFP-riviä ole väärin
+mapattu `oneworld_*`-tieriksi. `SELECT ... WHERE alliance_tier LIKE
+'oneworld_%' AND ffp.code IN ('lh-miles-more','ua-mileageplus','dl-skymiles',
+'af-flying-blue','ek-skywards','tk-miles-smiles')` → 0 riviä. Ei
+piilovirhettä cross-alliance-mismap:ien osalta.
+
+**Käytännön vaikutus:** No-op. Yksikään lounge/service-sääntö DB:ssä ei
+tällä hetkellä käytä `min_alliance_tier IN (star_*, skyteam_*)`, joten
+näiden mappausten olemassaolo ei muuta engine-vastauksia. Ne ovat
+seed-artefakti laajemmasta scope-menneisyydestä.
+
+**Toimenpide:** Ei mitään akuuttia. Jos tulevaisuudessa projekti kaventuu
+formaalisti "vain oneworld/Finnair"-scopeen (poistaa `star_*`/`skyteam_*`
+enum-arvot), tämä on migration-scope silloin. Nyt ne saavat jäädä
+lähteettöminä (`source_url = NULL`) — samasta syystä kuin base-tierit,
+mutta lisäksi siitä syystä ettei niitä ole PR-A/PR-B:n scope:ssa
+verifioida (SkyTeam/Star:lle ei ole vastaavaa lähdettä eikä projektin
+tarvetta).
+
 ---
 
 ## 74. HEL Finnair Platinum Wing / Corner — program-specific tier, ei oneworld-Emerald
