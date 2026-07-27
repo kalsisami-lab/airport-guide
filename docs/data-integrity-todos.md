@@ -1936,6 +1936,34 @@ seeded from memory. The empty-lounges list of an unverified airport
 is honest ("we don't know"); a false `verified_none` is a confident
 lie that ships in the UI.
 
+### Invariants for coverage_source_url (§69 broadened, 2026-07-27)
+
+`coverage_source_url` was originally used only when
+`lounge_coverage_status = 'verified_none'` — the URL justified the
+verified claim. §69 broadens the semantic to allow non-NULL values on
+`unverified` rows too, so **future enforcement scripts must not assume
+the older tighter invariant.** The current invariant matrix:
+
+  | coverage_status  | coverage_source_url | Meaning |
+  |---|---|---|
+  | verified_none    | URL present         | Verified no facility; URL justifies the claim |
+  | verified_none    | NULL                | **Inconsistent** — an enforcement script SHOULD flag this |
+  | verified_seeded  | URL present         | Full coverage verified; URL is the source consulted |
+  | verified_seeded  | NULL                | **Inconsistent** — should flag |
+  | **unverified**   | **URL present**     | **§69 case: source consulted, facility not fully modeled (Ryhmä 4 airports).** NOT verified_none. |
+  | unverified       | NULL                | Not investigated — the default. Valid, no flag. |
+
+The old invariant "source_url present ⟺ verified_none" is **NO LONGER
+TRUE**. The new invariant is:
+
+> `source_url present ⟹ the airport was investigated against a
+> primary source`, but the coverage_status can be any of the three
+> values depending on what the source revealed.
+
+An enforcement script written against the old invariant would
+incorrectly flag §69's 4 Ryhmä 4 airports (KTT/OUL/TKU/VAA) as
+malformed. It must use the new matrix above.
+
 ### Initial seeded rows (2026-07-24)
 
 `db/patch-coverage-verified-none-59.ts` sets three airports to
@@ -1969,9 +1997,11 @@ structurally different:
 The remaining Case B airports stay `unverified` until each batch has
 per-airport source verification. **Do not bulk-flip.**
 
-  - **Finnish regional (15)**: IVL, JOE, JYV, KAJ, KAO, KEM, KOK,
-    KTT, KUO, MHQ, OUL, RVN, TKU, TMP, VAA. Verifiable via
-    finavia.fi per-airport pages. Own batch.
+  - **Finnish regional (15)** — **DONE 2026-07-27 via §69**. IVL, JOE,
+    JYV, KAJ, KAO, KEM, KOK, KUO, MHQ, RVN, TMP → `verified_none`.
+    KTT, OUL, TKU, VAA → `unverified` + Finavia URL as `coverage_source_url`
+    (Ryhmä 4 — Finavia lists a Lounges-category facility our schema does
+    not yet model; see §69 for schema follow-up).
   - **Baltic small (2)**: TAY (Tartu), KUN (Kaunas). Verifiable via
     respective airport websites. Own batch.
   - **Small leisure / potential PP-only (13)**: ACE, TFN, DBV, SPU,
@@ -2178,3 +2208,169 @@ written, it must treat `internal-ref:` as a legitimate source (same as
   (all §68 rows have `internal-ref:` sources), but exactly the kind of
   drift a source_url enforcement script would surface. Own PR — either
   find primary sources or delete if unsupported.
+
+---
+
+## 69. Finnish regional airports — coverage + fast-track (2026-07-27)
+
+**Status:** 15 Finnish regional airports (all Finavia-listed regionals
+except HEL + military Halli/Utti) coverage-verified and fast-track-
+denied via `db/patch-finnish-regionals-coverage.ts`. Closes the Finnish
+regional bucket of §67's "deferred verification batches".
+
+**Sources per airport row:**
+
+  - Finavia `/{airport}/services` page (per-airport URL) — access-model
+    for each facility read from the "Opening hours" field, not from
+    facility name. See rubric below.
+  - Sami field-report: HEL is the **only** Finnish airport with a
+    permanent fast track and international lounges. All 15 regionals
+    get an explicit fast-track deny rule based on this + Finavia data.
+
+### §69 access-model rubric (applied consistently)
+
+Finavia categorizes facilities as `Lounges` or `VIP & Business` (or
+`Café`, `Shop`, etc.). Historically these have been classified by name
+(e.g. "VIP Lounge" → Ryhmä 4; "Meeting Room" → verified_none). §69
+adopts a stricter rubric that avoids the §51-class bug of name-based
+classification:
+
+> Classify by **access model** (from the Opening hours field), not
+> facility name.
+
+Cases:
+
+  - **`Lounges` category + drop-in access** (opening hours state
+    terminal-hours *without* "by agreement" qualifier) → walk-in
+    physical lounge → **Ryhmä 4**.
+  - **`VIP & Business` category + "by agreement"** (in opening hours) →
+    booking-based facility, not a drop-in lounge → **verified_none**
+    (from a public passenger's perspective, this is not lounge access).
+  - **`VIP & Business` category + drop-in** (no by-agreement qualifier)
+    → drop-in VIP room. Not automatically Ryhmä 4 (that requires the
+    `Lounges` category). Note the facility exists but stay conservative:
+    if the facility isn't in `Lounges` category, don't upgrade the
+    airport to Ryhmä 4 for it alone. Airport still classified by
+    strongest `Lounges` signal.
+  - **Cafés/Shops only** → verified_none (nothing to model as lounge).
+
+### Notable case corrections vs name-based intuition
+
+  - **TKU "VIP Lounge, Turku"** — Opening hours: "By agreement" → NOT
+    drop-in. If TKU were classified by name alone, it would trigger
+    Ryhmä 4 here — but the access model says booking-only, same as any
+    Meeting Room. TKU's Ryhmä 4 status comes from **"Working area
+    (Lounges category)"**, not this misleadingly-named VIP Lounge.
+  - **KTT "VIP Room"** — Opening hours: "During terminal opening hours"
+    (no by-agreement qualifier) → drop-in. Combined with **"Rocking
+    chair (Lounges category)"** → KTT is Ryhmä 4.
+  - **OUL Meeting Room Kaakkuri** — drop-in per opening hours but
+    `VIP & Business` category, not `Lounges`. OUL's Ryhmä 4 status
+    comes from **"Lounge: Hailuoto" (Lounges category, drop-in)**, not
+    from this Meeting Room.
+
+Rubric ensures TKU/OUL/KTT Ryhmä 4 status is anchored in an actual
+`Lounges` category entry, not name-based inference. Meeting Rooms
+(regardless of "VIP" wording in the name) are booking-only per opening
+hours and don't grant lounge status.
+
+### Coverage result (15 airports)
+
+**verified_none (11)** — no drop-in lounge facility per Finavia:
+
+  IVL, JOE, JYV, KAJ, KAO, KEM, KOK, KUO, MHQ, RVN, TMP
+
+**Ryhmä 4 — unverified with source (4)** — Finavia lists a facility in
+`Lounges` category (walk-in), but the schema does not currently model
+this "local facility" type; deferred to future PR:
+
+  KTT (VIP Room + Rocking chair), OUL (Lounge: Hailuoto),
+  TKU (Working area), VAA (Lounge, Vaasa)
+
+**RVN specifically verified** (user's explicit-attention request):
+Rovaniemi is a charter-heavy Lapland hub, but Finavia's `/services`
+page for RVN lists only cafés and restaurants — no VIP Room, no
+Lounges-category entry, no seasonal charter lounge. Even after manual
+sanity check on the raw page content, the result is honest
+verified_none. If Sami-field-report ever contradicts (e.g., a charter
+operator lounge exists on-site but isn't on Finavia's page), that
+would be a separate source and the row can be updated.
+
+### §67 coverage_source_url semantic — broadened
+
+§67 originally documented `coverage_source_url` as "the justification
+for the current coverage status" and stated that `unverified` rows
+should have `NULL` here (an unverified assertion needs no source).
+§69 broadens the semantic:
+
+  | coverage_status  | coverage_source_url | Meaning |
+  |---|---|---|
+  | verified_none    | URL present         | Verified no facility; source justifies |
+  | verified_none    | NULL                | (would be inconsistent — don't produce) |
+  | verified_seeded  | URL present         | Full coverage verified; source consulted |
+  | verified_seeded  | NULL                | (would be inconsistent — don't produce) |
+  | **unverified**   | **URL present**     | **Investigated against a source, but not fully modeled — new §69 case (Ryhmä 4 airports)** |
+  | unverified       | NULL                | Not investigated (default state) |
+
+The new `unverified + URL` sub-state captures "we looked at the source
+but our schema can't (yet) express what it says." This is honest —
+neither a false verified claim nor a bare `?` shrug.
+
+**UI implication:** dashboards showing an empty-lounge card should,
+for Ryhmä 4 airports, show a "see Finavia for facility info" link
+rather than the current bare `?`. **NOT wired in this PR** — pure
+data change. Separate UI PR when Ryhmä 4 seeding is implemented.
+
+### Fast track — absolute deny at all 15
+
+Per Sami field-report: HEL is the only permanent Finnish fast track.
+All 15 regionals get:
+
+```
+service_type       = 'fast_track_security'
+action             = 'deny'
+min_alliance_tier  = NULL
+carrier_restriction = NULL
+conditions         = NULL
+tier_semantics     = 'local'
+priority           = 100
+notes              = 'No fast track at this airport (§69 Finavia + Sami field-report)'
+source_url         = 'https://www.finavia.fi/en/airports/{slug}/services'
+```
+
+**Absolute** = engine's deny rules eval first (before allow rules) and
+have no cabin override (unlike §64 tier-deny which does). Sapphire+
+business pax at RVN → `denied` (matches source-verified absence). The
+`local` tier_semantics is used because this is airport-level absence
+(source-backed), not alliance-tier-defined absence.
+
+### Deferred (own follow-up PRs)
+
+  - **POR (Pori), SVL (Savonlinna), ENF (Enontekiö)** — not in
+    `airports` table. Adding would require OurAirports airport-row
+    seed (like §66 Case C pattern). Own tiny PR.
+  - **SVL 404 investigation** — Finavia's `savonlinna/services` page
+    returns HTTP 404 (all other airports return 200). The main
+    `savonlinna` page returns 200 but with minimal content (no closure
+    or charter language). Possible causes: (a) genuinely no services
+    to list, (b) URL structure differs for SVL, (c) reduced operational
+    status. **Investigate before treating SVL as ordinary airport row
+    to seed** — a 404 is a signal, not just a missing page.
+  - **Ryhmä 4 seeding schema** — modeling KTT/OUL/TKU/VAA's Lounges-
+    category facilities requires either a new `local_facility` channel
+    type or another kevyt mechanism. `paid` (Priority Pass etc.) does
+    not describe them; `invitation` does not describe drop-in access.
+    Own PR — schema decision + seed data.
+  - **UI change for `unverified + source_url`** — show "see source"
+    link instead of bare `?` for these airports.
+
+### Ties to existing sections
+
+  - **§67** — updates the "deferred verification batches" bullet:
+    Finnish regional (15) → done. Baltic (2) and small leisure (13)
+    remain unverified.
+  - **§59** — RVN is not in §59 (which covers Ryhmä 4 investigation
+    for BIQ/BOO/GZP/KKN/TOS/TRD only). §69 handles the broader
+    Finnish regional Ryhmä 4 case for KTT/OUL/TKU/VAA.
+  - **§66 Case B (b)** — the 15 Finnish regionals mentioned in Case B
+    as "unverified, own future PR" are now this PR.
