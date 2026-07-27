@@ -57,6 +57,11 @@ export const statusTiers = sqliteTable('status_tiers', {
     ],
   }).notNull().default('none'),
   fastTrack: integer('fast_track', { mode: 'boolean' }).notNull().default(false),
+  // §73 provenance: primary-source URL that attests the tier → alliance_tier mapping.
+  // Nullable because base tiers with alliance_tier='none' are the absence of alliance
+  // status, not a claim that requires a source (oneworld.com does not attest them).
+  sourceUrl:  text('source_url'),
+  verifiedAt: text('verified_at'),
 });
 
 // ─── Geography ────────────────────────────────────────────────────────────────
