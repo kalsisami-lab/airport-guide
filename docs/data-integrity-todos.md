@@ -1936,6 +1936,34 @@ seeded from memory. The empty-lounges list of an unverified airport
 is honest ("we don't know"); a false `verified_none` is a confident
 lie that ships in the UI.
 
+### Invariants for coverage_source_url (§69 broadened, 2026-07-27)
+
+`coverage_source_url` was originally used only when
+`lounge_coverage_status = 'verified_none'` — the URL justified the
+verified claim. §69 broadens the semantic to allow non-NULL values on
+`unverified` rows too, so **future enforcement scripts must not assume
+the older tighter invariant.** The current invariant matrix:
+
+  | coverage_status  | coverage_source_url | Meaning |
+  |---|---|---|
+  | verified_none    | URL present         | Verified no facility; URL justifies the claim |
+  | verified_none    | NULL                | **Inconsistent** — an enforcement script SHOULD flag this |
+  | verified_seeded  | URL present         | Full coverage verified; URL is the source consulted |
+  | verified_seeded  | NULL                | **Inconsistent** — should flag |
+  | **unverified**   | **URL present**     | **§69 case: source consulted, facility not fully modeled (Ryhmä 4 airports).** NOT verified_none. |
+  | unverified       | NULL                | Not investigated — the default. Valid, no flag. |
+
+The old invariant "source_url present ⟺ verified_none" is **NO LONGER
+TRUE**. The new invariant is:
+
+> `source_url present ⟹ the airport was investigated against a
+> primary source`, but the coverage_status can be any of the three
+> values depending on what the source revealed.
+
+An enforcement script written against the old invariant would
+incorrectly flag §69's 4 Ryhmä 4 airports (KTT/OUL/TKU/VAA) as
+malformed. It must use the new matrix above.
+
 ### Initial seeded rows (2026-07-24)
 
 `db/patch-coverage-verified-none-59.ts` sets three airports to
